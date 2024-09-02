@@ -1,0 +1,21 @@
+[workspace]
+resolver = "2"
+members = [
+    "solfees-be",
+]
+
+[workspace.package]
+authors = ["Solana Stream Solutions"]
+edition = "2021"
+homepage = "https://github.com/solana-stream-solutions"
+repository = "https://github.com/solana-stream-solutions/solfees-private"
+keywords = ["solana"]
+publish = false
+
+[workspace.dependencies]
+anyhow = "1.0.86"
+tokio = "1.40.0"
+
+[profile.release]
+lto = true
+codegen-units = 1
