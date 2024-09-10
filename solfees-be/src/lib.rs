@@ -1,3 +1,6 @@
+pub mod config;
+pub mod grpc_geyser;
+
 use {
     tracing::Subscriber,
     tracing_subscriber::{
