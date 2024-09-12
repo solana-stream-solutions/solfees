@@ -1,0 +1,15 @@
+tracing:
+  json: false # change to `true` for production
+
+grpc:
+  endpoint: http://127.0.0.1:10000/
+  x_token: null
+
+redis:
+  endpoint: redis://127.0.0.1:6379/
+  stream_key: solfees:events
+  stream_maxlen: 15000 # 15_000 / 4 / 2.5 / 60 = 25min (4 events per slot, 2.5 slots per sec)
+  stream_field_key: message
+
+listen_admin:
+  bind: 127.0.0.1:8002

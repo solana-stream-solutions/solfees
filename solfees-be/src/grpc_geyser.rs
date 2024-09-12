@@ -32,7 +32,7 @@ use {
     },
 };
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CommitmentLevel {
     Processed,
     Confirmed,
@@ -46,6 +46,16 @@ impl From<proto::CommitmentLevel> for CommitmentLevel {
             proto::CommitmentLevel::Processed => Self::Processed,
             proto::CommitmentLevel::Confirmed => Self::Confirmed,
             proto::CommitmentLevel::Finalized => Self::Finalized,
+        }
+    }
+}
+
+impl CommitmentLevel {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            CommitmentLevel::Processed => "processed",
+            CommitmentLevel::Confirmed => "confirmed",
+            CommitmentLevel::Finalized => "finalized",
         }
     }
 }
@@ -212,7 +222,7 @@ impl From<(VersionedTransactionWithStatusMeta, bool)> for GeyserTransaction {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum GeyserMessage {
     Slot {
         slot: Slot,

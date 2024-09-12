@@ -14,7 +14,7 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    solfees_be::tracing_init(false)?;
+    solfees_be::tracing::init(false)?;
 
     let args = Args::parse();
 

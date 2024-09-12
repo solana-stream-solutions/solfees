@@ -9,24 +9,38 @@ repository = { workspace = true }
 keywords = { workspace = true }
 publish = { workspace = true }
 
-[[bin]]
-name = "solfees-server"
-
 [dependencies]
 anyhow = { workspace = true }
 atty = { workspace = true }
+bincode = { workspace = true }
 borsh = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 futures = { workspace = true }
+http-body-util = { workspace = true }
+hyper = { workspace = true }
+hyper-util = { workspace = true, features = ["server-auto", "server-graceful"] }
+lazy_static = { workspace = true }
 maplit = { workspace = true }
+prometheus = { workspace = true }
+redis = { workspace = true, features = ["aio", "tokio-rustls-comp"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 solana-sdk = { workspace = true }
 solana-transaction-status = { workspace = true }
-tokio = { workspace = true, features = ["rt-multi-thread", "macros", "fs"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "fs", "signal"] }
 tonic = { workspace = true, features = ["gzip"] }
+tower = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["ansi", "env-filter", "json"] }
 yellowstone-grpc-client = { workspace = true }
 yellowstone-grpc-proto = { workspace = true }
+
+[build-dependencies]
+anyhow = { workspace = true }
+cargo-lock = { workspace = true }
+git-version = { workspace = true }
+vergen = { workspace = true, features = ["build", "rustc"] }
+
+[lints]
+workspace = true
