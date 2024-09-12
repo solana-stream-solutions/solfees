@@ -1,5 +1,5 @@
 use {
-    crate::metrics::create_response as metrics_create_response,
+    crate::metrics,
     http_body_util::{BodyExt, Empty as BodyEmpty, Full as FullBody},
     hyper::{
         body::{Bytes, Incoming as BodyIncoming},
@@ -32,7 +32,7 @@ pub async fn run_admin_server(addr: SocketAddr, shutdown: Arc<Notify>) -> anyhow
             service_fn(move |req: Request<BodyIncoming>| async move {
                 let (status, body) = match req.uri().path() {
                     "/health" => (StatusCode::OK, FullBody::new(Bytes::from("ok")).boxed()),
-                    "/metrics" => (StatusCode::OK, metrics_create_response()),
+                    "/metrics" => (StatusCode::OK, metrics::collect_to_body()),
                     _ => (StatusCode::NOT_FOUND, BodyEmpty::new().boxed()),
                 };
                 Response::builder().status(status).body(body)

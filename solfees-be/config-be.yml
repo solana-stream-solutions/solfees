@@ -1,0 +1,10 @@
+tracing:
+  json: false # change to `true` for production
+
+redis:
+  endpoint: redis://127.0.0.1:6379/
+  stream_key: solfees:events
+  stream_field_key: message
+
+listen_admin:
+  bind: 127.0.0.1:8001

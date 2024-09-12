@@ -6,13 +6,23 @@ use {
     std::net::{IpAddr, Ipv4Addr, SocketAddr},
 };
 
+pub trait WithConfigTracing {
+    fn get_tracing(&self) -> &ConfigTracing;
+}
+
 #[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct ConfigGrpc2Redis {
     pub tracing: ConfigTracing,
     pub grpc: ConfigGrpc,
-    pub redis: ConfigRedis,
+    pub redis: ConfigRedisPublisher,
     pub listen_admin: ConfigListenAdmin,
+}
+
+impl WithConfigTracing for ConfigGrpc2Redis {
+    fn get_tracing(&self) -> &ConfigTracing {
+        &self.tracing
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -45,14 +55,14 @@ impl Default for ConfigGrpc {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields, default)]
-pub struct ConfigRedis {
+pub struct ConfigRedisPublisher {
     pub endpoint: String,
     pub stream_key: String,
     pub stream_maxlen: u64,
     pub stream_field_key: String,
 }
 
-impl Default for ConfigRedis {
+impl Default for ConfigRedisPublisher {
     fn default() -> Self {
         Self {
             endpoint: "redis://127.0.0.1:6379/".to_owned(),
@@ -78,11 +88,36 @@ impl Default for ConfigListenAdmin {
     }
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields, default)]
 pub struct ConfigServer {
-    #[serde(default)]
     pub tracing: ConfigTracing,
+    pub redis: ConfigRedisConsumer,
+    pub listen_admin: ConfigListenAdmin,
+}
+
+impl WithConfigTracing for ConfigServer {
+    fn get_tracing(&self) -> &ConfigTracing {
+        &self.tracing
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct ConfigRedisConsumer {
+    pub endpoint: String,
+    pub stream_key: String,
+    pub stream_field_key: String,
+}
+
+impl Default for ConfigRedisConsumer {
+    fn default() -> Self {
+        Self {
+            endpoint: "redis://127.0.0.1:6379/".to_owned(),
+            stream_key: "solfees:events".to_owned(),
+            stream_field_key: "message".to_owned(),
+        }
+    }
 }
 
 fn deserialize_listen<'de, D>(deserializer: D) -> Result<SocketAddr, D::Error>

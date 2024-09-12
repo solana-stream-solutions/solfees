@@ -1,44 +1,25 @@
 use {
     anyhow::Context,
-    clap::Parser,
     redis::{AsyncConnectionConfig, Client},
-    solfees_be::{config::ConfigGrpc2Redis as Config, grpc_geyser::GeyserMessage, metrics},
-    std::{
-        sync::{
-            atomic::{AtomicU64, Ordering},
-            Arc,
-        },
-        time::Duration,
+    solfees_be::{
+        cli,
+        config::ConfigGrpc2Redis as Config,
+        grpc_geyser::{self, GeyserMessage},
+        metrics::grpc2redis as metrics,
+        rpc::run_admin_server,
     },
+    std::{sync::Arc, time::Duration},
     tokio::{signal::unix::SignalKind, sync::Notify},
     tracing::{error, warn},
 };
 
 fn main() -> anyhow::Result<()> {
-    metrics::register_custom_metrics();
-
-    tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .thread_name_fn(|| {
-            static THREAD_ID: AtomicU64 = AtomicU64::new(0);
-            let id = THREAD_ID.fetch_add(1, Ordering::Relaxed);
-            format!("grpc2redis-{id:02}")
-        })
-        .build()?
-        .block_on(main2())
+    cli::run_main(metrics::init, |id| format!("grpc2redis-{id:02}"), main2)
 }
 
-async fn main2() -> anyhow::Result<()> {
-    let args = solfees_be::cli::Args::parse();
-    let config = args.load_config::<Config>().await?;
-    if args.check {
-        return Ok(());
-    }
-
-    solfees_be::tracing::init(config.tracing.json)?;
-
+async fn main2(config: Config) -> anyhow::Result<()> {
     let rpc_admin_shutdown = Arc::new(Notify::new());
-    let rpc_admin_fut = tokio::spawn(solfees_be::rpc::run_admin_server(
+    let rpc_admin_fut = tokio::spawn(run_admin_server(
         config.listen_admin.bind,
         Arc::clone(&rpc_admin_shutdown),
     ));
@@ -52,11 +33,11 @@ async fn main2() -> anyhow::Result<()> {
         .await
         .context("failed to get Redis connection")?;
 
-    let mut geyser = solfees_be::grpc_geyser::subscribe(config.grpc.endpoint, config.grpc.x_token)
+    let mut geyser = grpc_geyser::subscribe(config.grpc.endpoint, config.grpc.x_token)
         .await
         .context("failed to open gRPC subscription")?;
 
-    let mut shutdown_rx = solfees_be::cli::shutdown_signal();
+    let mut shutdown_rx = cli::shutdown_signal();
     let sigint = SignalKind::interrupt();
     let sigterm = SignalKind::terminate();
 
@@ -108,7 +89,7 @@ async fn main2() -> anyhow::Result<()> {
         metrics::redis_messages_pushed_inc_by(messages.len());
         for message in messages {
             if let GeyserMessage::Slot { slot, commitment } = message {
-                metrics::grpc_geyser_slot_set(commitment, slot);
+                metrics::redis_slot_pushed_set(commitment, slot);
             }
         }
     }
