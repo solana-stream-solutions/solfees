@@ -8,3 +8,6 @@ redis:
 
 listen_admin:
   bind: 127.0.0.1:8001
+
+listen_rpc:
+  bind: 127.0.0.1:8000

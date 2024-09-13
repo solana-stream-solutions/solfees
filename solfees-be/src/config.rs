@@ -90,13 +90,14 @@ impl Default for ConfigListenAdmin {
 
 #[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields, default)]
-pub struct ConfigServer {
+pub struct ConfigSolfees {
     pub tracing: ConfigTracing,
     pub redis: ConfigRedisConsumer,
     pub listen_admin: ConfigListenAdmin,
+    pub listen_rpc: ConfigListenRpc,
 }
 
-impl WithConfigTracing for ConfigServer {
+impl WithConfigTracing for ConfigSolfees {
     fn get_tracing(&self) -> &ConfigTracing {
         &self.tracing
     }
@@ -116,6 +117,21 @@ impl Default for ConfigRedisConsumer {
             endpoint: "redis://127.0.0.1:6379/".to_owned(),
             stream_key: "solfees:events".to_owned(),
             stream_field_key: "message".to_owned(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct ConfigListenRpc {
+    #[serde(deserialize_with = "deserialize_listen")]
+    pub bind: SocketAddr,
+}
+
+impl Default for ConfigListenRpc {
+    fn default() -> Self {
+        Self {
+            bind: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8000),
         }
     }
 }

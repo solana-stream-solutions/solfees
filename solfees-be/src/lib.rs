@@ -3,6 +3,7 @@ pub mod config;
 pub mod grpc_geyser;
 pub mod metrics;
 pub mod redis;
-pub mod rpc;
+pub mod rpc_server;
+pub mod rpc_solana;
 pub mod tracing;
 pub mod version;

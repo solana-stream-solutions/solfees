@@ -15,7 +15,7 @@ use {
     tracing::{error, info},
 };
 
-pub async fn run_admin_server(addr: SocketAddr, shutdown: Arc<Notify>) -> anyhow::Result<()> {
+pub async fn run_admin(addr: SocketAddr, shutdown: Arc<Notify>) -> anyhow::Result<()> {
     let listener = TcpListener::bind(addr).await?;
     info!(%addr, "Start Admin RPC server");
 
@@ -34,6 +34,46 @@ pub async fn run_admin_server(addr: SocketAddr, shutdown: Arc<Notify>) -> anyhow
                     "/health" => (StatusCode::OK, FullBody::new(Bytes::from("ok")).boxed()),
                     "/metrics" => (StatusCode::OK, metrics::collect_to_body()),
                     _ => (StatusCode::NOT_FOUND, BodyEmpty::new().boxed()),
+                };
+                Response::builder().status(status).body(body)
+            }),
+        );
+        let fut = graceful.watch(connection.into_owned());
+
+        tokio::spawn(async move {
+            if let Err(error) = fut.await {
+                error!(%error, "failed to handle connection");
+            }
+        });
+    }
+
+    drop(listener);
+    graceful.shutdown().await;
+
+    Ok::<(), anyhow::Error>(())
+}
+
+pub async fn run_solfees(addr: SocketAddr, shutdown: Arc<Notify>) -> anyhow::Result<()> {
+    let listener = TcpListener::bind(addr).await?;
+    info!(%addr, "Start Solfees RPC server");
+
+    let http = ServerBuilder::new(TokioExecutor::new());
+    let graceful = GracefulShutdown::new();
+    loop {
+        let (stream, _addr) = tokio::select! {
+            () = shutdown.notified() => break,
+            maybe_incoming = listener.accept() => maybe_incoming?,
+        };
+
+        let connection = http.serve_connection(
+            TokioIo::new(Box::pin(stream)),
+            service_fn(move |req: Request<BodyIncoming>| async move {
+                let (status, body) = match req.uri().path() {
+                    // "/health" => (StatusCode::OK, FullBody::new(Bytes::from("ok")).boxed()),
+                    // "/metrics" => (StatusCode::OK, metrics::collect_to_body()),
+                    // "/api/solana"
+                    // "/api/solfees/ws"
+                    _ => (StatusCode::NOT_FOUND, BodyEmpty::<Bytes>::new().boxed()), // remove <Bytes>
                 };
                 Response::builder().status(status).body(body)
             }),

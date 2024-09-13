@@ -1,12 +1,13 @@
 use {
     anyhow::Context,
+    futures::future::{try_join_all, FutureExt, TryFutureExt},
     redis::{AsyncConnectionConfig, Client},
     solfees_be::{
         cli,
         config::ConfigGrpc2Redis as Config,
         grpc_geyser::{self, GeyserMessage},
         metrics::grpc2redis as metrics,
-        rpc::run_admin_server,
+        rpc_server,
     },
     std::{sync::Arc, time::Duration},
     tokio::{signal::unix::SignalKind, sync::Notify},
@@ -19,10 +20,15 @@ fn main() -> anyhow::Result<()> {
 
 async fn main2(config: Config) -> anyhow::Result<()> {
     let rpc_admin_shutdown = Arc::new(Notify::new());
-    let rpc_admin_fut = tokio::spawn(run_admin_server(
+    let rpc_admin_fut = tokio::spawn(rpc_server::run_admin(
         config.listen_admin.bind,
         Arc::clone(&rpc_admin_shutdown),
-    ));
+    ))
+    .map(|result| result?)
+    .map_err(|error| error.context("Admin RPC failed"))
+    .boxed();
+
+    let mut spawned_tasks = try_join_all(vec![rpc_admin_fut]);
 
     let client =
         Client::open(config.redis.endpoint.clone()).context("failed to create Redis client")?;
@@ -33,7 +39,7 @@ async fn main2(config: Config) -> anyhow::Result<()> {
         .await
         .context("failed to get Redis connection")?;
 
-    let mut geyser = grpc_geyser::subscribe(config.grpc.endpoint, config.grpc.x_token)
+    let mut geyser_rx = grpc_geyser::subscribe(config.grpc.endpoint, config.grpc.x_token)
         .await
         .context("failed to open gRPC subscription")?;
 
@@ -54,7 +60,11 @@ async fn main2(config: Config) -> anyhow::Result<()> {
                 };
                 break;
             }
-            value = geyser.recv() => {
+            value = &mut spawned_tasks => {
+                let _: Vec<()> = value?;
+                anyhow::bail!("spawned tasks finished");
+            }
+            value = geyser_rx.recv() => {
                 if let Some(maybe_message) = value {
                     vec![maybe_message?]
                 } else {
@@ -64,7 +74,7 @@ async fn main2(config: Config) -> anyhow::Result<()> {
             }
         };
 
-        while let Ok(maybe_message) = geyser.try_recv() {
+        while let Ok(maybe_message) = geyser_rx.try_recv() {
             messages.push(maybe_message?);
         }
 
@@ -95,6 +105,7 @@ async fn main2(config: Config) -> anyhow::Result<()> {
     }
 
     rpc_admin_shutdown.notify_one();
+
     tokio::select! {
         signal = shutdown_rx.recv() => {
             match signal {
@@ -104,7 +115,9 @@ async fn main2(config: Config) -> anyhow::Result<()> {
                 None => error!("shutdown channel is down"),
             };
         },
-        result = rpc_admin_fut => result??,
+        value = &mut spawned_tasks => {
+            let _: Vec<()> = value?;
+        }
     }
 
     Ok(())
