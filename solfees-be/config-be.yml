@@ -11,3 +11,6 @@ listen_admin:
 
 listen_rpc:
   bind: 127.0.0.1:8000
+  body_limit: 50KiB
+  request_timeout: 60s
+  request_queue_max: 1000

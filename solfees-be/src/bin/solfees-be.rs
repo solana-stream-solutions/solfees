@@ -14,7 +14,11 @@ fn main() -> anyhow::Result<()> {
 }
 
 async fn main2(config: Config) -> anyhow::Result<()> {
-    let (solana_rpc, solana_rpc_fut) = SolanaRpc::new();
+    let (solana_rpc, solana_rpc_fut) = SolanaRpc::new(
+        config.listen_rpc.request_calls_max,
+        config.listen_rpc.request_timeout,
+        config.listen_rpc.request_queue_max,
+    );
     let solana_rpc_fut = tokio::spawn(solana_rpc_fut)
         .map(|result| result?)
         .map_err(|error| error.context("SolanaRPC loop failed"))
@@ -32,6 +36,8 @@ async fn main2(config: Config) -> anyhow::Result<()> {
     let rpc_solfees_shutdown = Arc::new(Notify::new());
     let rpc_solfees_fut = tokio::spawn(rpc_server::run_solfees(
         config.listen_rpc.bind,
+        config.listen_rpc.body_limit,
+        solana_rpc.clone(),
         Arc::clone(&rpc_solfees_shutdown),
     ))
     .map(|result| result?)
@@ -73,7 +79,7 @@ async fn main2(config: Config) -> anyhow::Result<()> {
         }
     }
 
-    solana_rpc.shutdown();
+    solana_rpc.shutdown()?;
     rpc_admin_shutdown.notify_one();
     rpc_solfees_shutdown.notify_one();
 

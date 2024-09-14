@@ -1,8 +1,15 @@
 use {
-    crate::metrics,
-    http_body_util::{BodyExt, Empty as BodyEmpty, Full as FullBody},
+    crate::{
+        metrics,
+        rpc_solana::{SolanaRpc, SolanaRpcMode},
+    },
+    futures::future::TryFutureExt,
+    http_body_util::{
+        combinators::BoxBody, BodyExt, Empty as BodyEmpty, Full as BodyFull, Limited,
+    },
     hyper::{
         body::{Bytes, Incoming as BodyIncoming},
+        header::CONTENT_TYPE,
         service::service_fn,
         Request, Response, StatusCode,
     },
@@ -10,8 +17,11 @@ use {
         rt::tokio::{TokioExecutor, TokioIo},
         server::{conn::auto::Builder as ServerBuilder, graceful::GracefulShutdown},
     },
-    std::{net::SocketAddr, sync::Arc},
-    tokio::{net::TcpListener, sync::Notify},
+    std::{convert::Infallible, net::SocketAddr, sync::Arc},
+    tokio::{
+        net::TcpListener,
+        sync::{broadcast, Notify},
+    },
     tracing::{error, info},
 };
 
@@ -31,7 +41,7 @@ pub async fn run_admin(addr: SocketAddr, shutdown: Arc<Notify>) -> anyhow::Resul
             TokioIo::new(Box::pin(stream)),
             service_fn(move |req: Request<BodyIncoming>| async move {
                 let (status, body) = match req.uri().path() {
-                    "/health" => (StatusCode::OK, FullBody::new(Bytes::from("ok")).boxed()),
+                    "/health" => (StatusCode::OK, BodyFull::new(Bytes::from("ok")).boxed()),
                     "/metrics" => (StatusCode::OK, metrics::collect_to_body()),
                     _ => (StatusCode::NOT_FOUND, BodyEmpty::new().boxed()),
                 };
@@ -53,7 +63,12 @@ pub async fn run_admin(addr: SocketAddr, shutdown: Arc<Notify>) -> anyhow::Resul
     Ok::<(), anyhow::Error>(())
 }
 
-pub async fn run_solfees(addr: SocketAddr, shutdown: Arc<Notify>) -> anyhow::Result<()> {
+pub async fn run_solfees(
+    addr: SocketAddr,
+    body_limit: usize,
+    solana_rpc: SolanaRpc,
+    shutdown: Arc<Notify>,
+) -> anyhow::Result<()> {
     let listener = TcpListener::bind(addr).await?;
     info!(%addr, "Start Solfees RPC server");
 
@@ -65,17 +80,43 @@ pub async fn run_solfees(addr: SocketAddr, shutdown: Arc<Notify>) -> anyhow::Res
             maybe_incoming = listener.accept() => maybe_incoming?,
         };
 
+        let solana_rpc = solana_rpc.clone();
+        let (shutdown_tx, shutdown_rx) = broadcast::channel(1);
         let connection = http.serve_connection(
             TokioIo::new(Box::pin(stream)),
-            service_fn(move |req: Request<BodyIncoming>| async move {
-                let (status, body) = match req.uri().path() {
-                    // "/health" => (StatusCode::OK, FullBody::new(Bytes::from("ok")).boxed()),
-                    // "/metrics" => (StatusCode::OK, metrics::collect_to_body()),
-                    // "/api/solana"
-                    // "/api/solfees/ws"
-                    _ => (StatusCode::NOT_FOUND, BodyEmpty::<Bytes>::new().boxed()), // remove <Bytes>
-                };
-                Response::builder().status(status).body(body)
+            service_fn(move |req: Request<BodyIncoming>| {
+                let solana_rpc = solana_rpc.clone();
+                let shutdown_rx = shutdown_rx.resubscribe();
+                async move {
+                    let (status, body) = match req.uri().path() {
+                        "/api/solana" => {
+                            call_solana_rpc(
+                                solana_rpc,
+                                SolanaRpcMode::Solana,
+                                req,
+                                body_limit,
+                                shutdown_rx,
+                            )
+                            .await
+                        }
+                        "/api/solana/triton" => {
+                            call_solana_rpc(
+                                solana_rpc,
+                                SolanaRpcMode::Triton,
+                                req,
+                                body_limit,
+                                shutdown_rx,
+                            )
+                            .await
+                        }
+                        _ => (StatusCode::NOT_FOUND, BodyEmpty::new().boxed()),
+                    };
+                    let mut builder = Response::builder().status(status);
+                    if status == StatusCode::OK {
+                        builder = builder.header(CONTENT_TYPE, "application/json; charset=utf-8");
+                    }
+                    builder.body(body)
+                }
             }),
         );
         let fut = graceful.watch(connection.into_owned());
@@ -84,6 +125,7 @@ pub async fn run_solfees(addr: SocketAddr, shutdown: Arc<Notify>) -> anyhow::Res
             if let Err(error) = fut.await {
                 error!(%error, "failed to handle connection");
             }
+            drop(shutdown_tx);
         });
     }
 
@@ -91,4 +133,25 @@ pub async fn run_solfees(addr: SocketAddr, shutdown: Arc<Notify>) -> anyhow::Res
     graceful.shutdown().await;
 
     Ok::<(), anyhow::Error>(())
+}
+
+async fn call_solana_rpc(
+    solana_rpc: SolanaRpc,
+    solana_mode: SolanaRpcMode,
+    request: Request<BodyIncoming>,
+    body_limit: usize,
+    shutdown_tx: broadcast::Receiver<()>,
+) -> (StatusCode, BoxBody<Bytes, Infallible>) {
+    match Limited::new(request.into_body(), body_limit)
+        .collect()
+        .map_err(|error| anyhow::anyhow!(error))
+        .and_then(|body| solana_rpc.on_request(solana_mode, body.aggregate(), shutdown_tx))
+        .await
+    {
+        Ok(body) => (StatusCode::OK, BodyFull::new(Bytes::from(body)).boxed()),
+        Err(error) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            BodyFull::new(Bytes::from(format!("{error}"))).boxed(),
+        ),
+    }
 }

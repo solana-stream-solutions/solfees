@@ -17,8 +17,11 @@ borsh = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 futures = { workspace = true }
 http-body-util = { workspace = true }
+human-size = { workspace = true }
+humantime-serde = { workspace = true }
 hyper = { workspace = true }
 hyper-util = { workspace = true, features = ["server-auto", "server-graceful"] }
+jsonrpc-core = { workspace = true }
 lazy_static = { workspace = true }
 maplit = { workspace = true }
 prometheus = { workspace = true }
@@ -26,8 +29,10 @@ redis = { workspace = true, features = ["aio", "tokio-rustls-comp", "ahash"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
+solana-rpc-client-api = { workspace = true }
 solana-sdk = { workspace = true }
 solana-transaction-status = { workspace = true }
+solana-version = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "fs", "signal"] }
 tonic = { workspace = true, features = ["gzip"] }
 tower = { workspace = true }

@@ -1,9 +1,14 @@
 use {
+    human_size::Size,
     serde::{
         de::{self, Deserializer},
         Deserialize,
     },
-    std::net::{IpAddr, Ipv4Addr, SocketAddr},
+    std::{
+        net::{IpAddr, Ipv4Addr, SocketAddr},
+        str::FromStr,
+        time::Duration,
+    },
 };
 
 pub trait WithConfigTracing {
@@ -126,12 +131,22 @@ impl Default for ConfigRedisConsumer {
 pub struct ConfigListenRpc {
     #[serde(deserialize_with = "deserialize_listen")]
     pub bind: SocketAddr,
+    #[serde(deserialize_with = "deserialize_humansize")]
+    pub body_limit: usize,
+    pub request_calls_max: usize,
+    #[serde(with = "humantime_serde")]
+    pub request_timeout: Duration,
+    pub request_queue_max: usize,
 }
 
 impl Default for ConfigListenRpc {
     fn default() -> Self {
         Self {
             bind: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8000),
+            body_limit: 50 * 1024,
+            request_calls_max: 100,
+            request_timeout: Duration::from_secs(60),
+            request_queue_max: 1_000,
         }
     }
 }
@@ -162,4 +177,13 @@ where
             })
             .map_err(de::Error::custom),
     }
+}
+
+fn deserialize_humansize<'de, D>(deserializer: D) -> Result<usize, D::Error>
+where
+    D: de::Deserializer<'de>,
+{
+    let value = String::deserialize(deserializer)?;
+    let size = Size::from_str(&value).map_err(de::Error::custom)?;
+    Ok(size.to_bytes() as usize)
 }
