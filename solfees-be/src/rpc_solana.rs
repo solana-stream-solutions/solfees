@@ -158,7 +158,8 @@ impl SolanaRpc {
                             })
                         }
                     };
-                    match parsed_params {
+
+                    outputs.push(match parsed_params {
                         Ok((commitment, rollback, min_context_slot)) => {
                             requests.push(RpcRequest::GetLatestBlockhash {
                                 id: call.id,
@@ -167,12 +168,38 @@ impl SolanaRpc {
                                 rollback,
                                 min_context_slot,
                             });
-                            outputs.push(None);
+                            None
                         }
-                        Err(error) => {
-                            outputs.push(Some(Self::create_failure(call.jsonrpc, call.id, error)))
-                        }
+                        Err(error) => Some(Self::create_failure(call.jsonrpc, call.id, error)),
+                    });
+                }
+                "getSlot" => {
+                    #[derive(Debug, Deserialize)]
+                    struct ReqParams {
+                        #[serde(default)]
+                        config: Option<RpcContextConfig>,
                     }
+
+                    outputs.push(
+                        match call.params.parse().map(|ReqParams { config }| {
+                            let RpcContextConfig {
+                                commitment,
+                                min_context_slot,
+                            } = config.unwrap_or_default();
+                            (commitment, min_context_slot)
+                        }) {
+                            Ok((commitment, min_context_slot)) => {
+                                requests.push(RpcRequest::GetSlot {
+                                    id: call.id,
+                                    jsonrpc: call.jsonrpc,
+                                    commitment: commitment.unwrap_or_default().into(),
+                                    min_context_slot,
+                                });
+                                None
+                            }
+                            Err(error) => Some(Self::create_failure(call.jsonrpc, call.id, error)),
+                        },
+                    )
                 }
                 "getVersion" => {
                     outputs.push(Some(if let Err(error) = call.params.expect_no_params() {
@@ -373,6 +400,22 @@ impl SolanaRpc {
                                             },
                                         })
                                     }
+                                    RpcRequest::GetSlot { id, jsonrpc, commitment, min_context_slot } => {
+                                        let slot = match commitment {
+                                            CommitmentLevel::Processed => latest_blockhash_storage.slot_processed,
+                                            CommitmentLevel::Confirmed => latest_blockhash_storage.slot_confirmed,
+                                            CommitmentLevel::Finalized => latest_blockhash_storage.slot_finalized,
+                                        };
+
+                                        if let Some(min_context_slot) = min_context_slot {
+                                            if slot < min_context_slot {
+                                                let error = RpcCustomError::MinContextSlotNotReached { context_slot: slot }.into();
+                                                return Self::create_failure(jsonrpc, id, error);
+                                            }
+                                        }
+
+                                        Self::create_success(jsonrpc, id, slot)
+                                    }
                                 }
                             })
                             .collect::<Vec<JsonrpcOutput>>();
@@ -411,6 +454,12 @@ enum RpcRequest {
         jsonrpc: Option<JsonrpcVersion>,
         commitment: CommitmentLevel,
         rollback: usize,
+        min_context_slot: Option<Slot>,
+    },
+    GetSlot {
+        id: JsonrpcId,
+        jsonrpc: Option<JsonrpcVersion>,
+        commitment: CommitmentLevel,
         min_context_slot: Option<Slot>,
     },
 }
