@@ -30,6 +30,7 @@ redis = { workspace = true, features = ["aio", "tokio-rustls-comp", "ahash"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
+solana-compute-budget = { workspace = true }
 solana-rpc-client-api = { workspace = true }
 solana-sdk = { workspace = true }
 solana-transaction-status = { workspace = true }

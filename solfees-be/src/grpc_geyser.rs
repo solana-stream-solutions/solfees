@@ -4,6 +4,9 @@ use {
     futures::stream::StreamExt,
     maplit::hashmap,
     serde::{Deserialize, Serialize},
+    solana_compute_budget::compute_budget_processor::{
+        DEFAULT_INSTRUCTION_COMPUTE_UNIT_LIMIT, MAX_COMPUTE_UNIT_LIMIT,
+    },
     solana_sdk::{
         clock::{Slot, UnixTimestamp},
         commitment_config::{
@@ -204,7 +207,7 @@ impl From<(VersionedTransactionWithStatusMeta, bool)> for GeyserTransaction {
                             &mut ix.data.as_slice(),
                         ) {
                             Ok(ComputeBudgetInstruction::SetComputeUnitLimit(value)) => {
-                                unit_limit = Some(1_400_000.min(value));
+                                unit_limit = Some(MAX_COMPUTE_UNIT_LIMIT.min(value));
                             }
                             Ok(ComputeBudgetInstruction::SetComputeUnitPrice(value)) => {
                                 unit_price = value;
@@ -224,7 +227,9 @@ impl From<(VersionedTransactionWithStatusMeta, bool)> for GeyserTransaction {
             }
             ixs_count += 1;
         }
-        let unit_limit = unit_limit.unwrap_or_else(|| 1_400_000.min(ixs_count * 200_000));
+        let unit_limit = unit_limit.unwrap_or_else(|| {
+            MAX_COMPUTE_UNIT_LIMIT.min(ixs_count * DEFAULT_INSTRUCTION_COMPUTE_UNIT_LIMIT)
+        });
         let units_consumed = meta.compute_units_consumed;
         let fee = meta.fee;
 

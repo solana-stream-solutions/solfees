@@ -3553,6 +3553,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "solana-compute-budget",
  "solana-rpc-client-api",
  "solana-sdk",
  "solana-transaction-status",
