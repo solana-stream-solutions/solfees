@@ -88,34 +88,17 @@ pub async fn run_solfees(
                 let solana_rpc = solana_rpc.clone();
                 let shutdown_rx = shutdown_rx.resubscribe();
                 async move {
-                    let (status, body) = match req.uri().path() {
-                        "/api/solana" => {
-                            call_solana_rpc(
-                                solana_rpc,
-                                SolanaRpcMode::Solana,
-                                req,
-                                body_limit,
-                                shutdown_rx,
-                            )
-                            .await
+                    let solana_rpc_mode = match req.uri().path() {
+                        "/api/solana" => SolanaRpcMode::Solana,
+                        "/api/solana/triton" => SolanaRpcMode::Triton,
+                        _ => {
+                            return Response::builder()
+                                .status(StatusCode::NOT_FOUND)
+                                .body(BodyEmpty::new().boxed())
                         }
-                        "/api/solana/triton" => {
-                            call_solana_rpc(
-                                solana_rpc,
-                                SolanaRpcMode::Triton,
-                                req,
-                                body_limit,
-                                shutdown_rx,
-                            )
-                            .await
-                        }
-                        _ => (StatusCode::NOT_FOUND, BodyEmpty::new().boxed()),
                     };
-                    let mut builder = Response::builder().status(status);
-                    if status == StatusCode::OK {
-                        builder = builder.header(CONTENT_TYPE, "application/json; charset=utf-8");
-                    }
-                    builder.body(body)
+
+                    call_solana_rpc(solana_rpc, solana_rpc_mode, req, body_limit, shutdown_rx).await
                 }
             }),
         );
@@ -141,17 +124,18 @@ async fn call_solana_rpc(
     request: Request<BodyIncoming>,
     body_limit: usize,
     shutdown_tx: broadcast::Receiver<()>,
-) -> (StatusCode, BoxBody<Bytes, Infallible>) {
+) -> http::Result<Response<BoxBody<Bytes, Infallible>>> {
     match Limited::new(request.into_body(), body_limit)
         .collect()
         .map_err(|error| anyhow::anyhow!(error))
         .and_then(|body| solana_rpc.on_request(solana_mode, body.aggregate(), shutdown_tx))
         .await
     {
-        Ok(body) => (StatusCode::OK, BodyFull::new(Bytes::from(body)).boxed()),
-        Err(error) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            BodyFull::new(Bytes::from(format!("{error}"))).boxed(),
-        ),
+        Ok(body) => Response::builder()
+            .header(CONTENT_TYPE, "application/json; charset=utf-8")
+            .body(BodyFull::new(Bytes::from(body)).boxed()),
+        Err(error) => Response::builder()
+            .status(StatusCode::INTERNAL_SERVER_ERROR)
+            .body(BodyFull::new(Bytes::from(format!("{error}"))).boxed()),
     }
 }

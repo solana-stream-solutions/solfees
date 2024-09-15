@@ -2,12 +2,16 @@ use {
     crate::grpc_geyser::{CommitmentLevel, GeyserMessage},
     hyper::body::Buf,
     jsonrpc_core::{
-        Call as RpcCall, Error as RpcError, Failure as RpcFailure, Id as RpcId,
-        MethodCall as RpcMethodCall, Output as RpcOutput, Response as RpcResponse,
-        Success as RpcSuccess, Version as RpcVersion,
+        Call as JsonrpcCall, Error as JsonrpcError, Failure as JsonrpcFailure, Id as JsonrpcId,
+        Output as JsonrpcOutput, Response as JsonrpcResponse, Success as JsonrpcSuccess,
+        Version as JsonrpcVersion,
     },
     serde::{Deserialize, Serialize},
-    solana_rpc_client_api::response::RpcVersionInfo,
+    solana_rpc_client_api::{
+        config::RpcContextConfig,
+        custom_error::RpcCustomError,
+        response::{Response as RpcResponse, RpcBlockhash, RpcResponseContext, RpcVersionInfo},
+    },
     solana_sdk::{
         clock::{Slot, MAX_RECENT_BLOCKHASHES},
         hash::Hash,
@@ -58,7 +62,7 @@ impl SolanaRpc {
                 geyser_tx,
                 requests_tx,
             },
-            Self::run_loop(geyser_rx),
+            Self::run_loop(geyser_rx, requests_rx),
         )
     }
 
@@ -83,14 +87,14 @@ impl SolanaRpc {
     ) -> anyhow::Result<Vec<u8>> {
         #[derive(Debug, Deserialize)]
         #[serde(untagged)]
-        enum RpcCalls {
-            Single(RpcCall),
-            Batch(Vec<RpcCall>),
+        enum JsonrpcCalls {
+            Single(JsonrpcCall),
+            Batch(Vec<JsonrpcCall>),
         }
 
         let (batched_calls, calls) = match serde_json::from_reader(body.reader())? {
-            RpcCalls::Single(call) => (false, vec![call]),
-            RpcCalls::Batch(calls) => (true, calls),
+            JsonrpcCalls::Single(call) => (false, vec![call]),
+            JsonrpcCalls::Batch(calls) => (true, calls),
         };
         let calls_total = calls.len();
         anyhow::ensure!(
@@ -99,28 +103,80 @@ impl SolanaRpc {
             self.request_calls_max
         );
 
-        let mut outputs: Vec<Option<RpcOutput>> = vec![];
+        let mut outputs = Vec::with_capacity(calls_total);
         let mut requests = Vec::with_capacity(calls_total);
         for call in calls {
             let call = match call {
-                RpcCall::MethodCall(call) => call,
-                RpcCall::Notification(_) => {
+                JsonrpcCall::MethodCall(call) => call,
+                JsonrpcCall::Notification(notification) => {
                     outputs.push(Some(Self::create_failure(
-                        RpcError::invalid_request(),
-                        RpcId::Null,
+                        notification.jsonrpc,
+                        JsonrpcId::Null,
+                        JsonrpcError::invalid_request(),
                     )));
                     continue;
                 }
-                RpcCall::Invalid { id } => {
-                    outputs.push(Some(Self::create_failure(RpcError::invalid_request(), id)));
+                JsonrpcCall::Invalid { id } => {
+                    outputs.push(Some(Self::create_failure(
+                        None,
+                        id,
+                        JsonrpcError::invalid_request(),
+                    )));
                     continue;
                 }
             };
 
             match call.method.as_str() {
+                "getLatestBlockhash" => {
+                    let parsed_params = match mode {
+                        SolanaRpcMode::Solana => {
+                            #[derive(Debug, Deserialize)]
+                            struct ReqParams {
+                                #[serde(default)]
+                                config: Option<RpcContextConfig>,
+                            }
+
+                            call.params.parse().map(|ReqParams { config }| {
+                                let RpcContextConfig {
+                                    commitment,
+                                    min_context_slot,
+                                } = config.unwrap_or_default();
+                                (commitment, 0, min_context_slot)
+                            })
+                        }
+                        SolanaRpcMode::Triton => {
+                            #[derive(Debug, Deserialize)]
+                            struct ReqParams {
+                                #[serde(default)]
+                                config: Option<RpcLatestBlockhashConfig>,
+                            }
+
+                            call.params.parse().map(|ReqParams { config }| {
+                                let RpcLatestBlockhashConfig { context, rollback } =
+                                    config.unwrap_or_default();
+                                (context.commitment, rollback, context.min_context_slot)
+                            })
+                        }
+                    };
+                    match parsed_params {
+                        Ok((commitment, rollback, min_context_slot)) => {
+                            requests.push(RpcRequest::GetLatestBlockhash {
+                                id: call.id,
+                                jsonrpc: call.jsonrpc,
+                                commitment: commitment.unwrap_or_default().into(),
+                                rollback,
+                                min_context_slot,
+                            });
+                            outputs.push(None);
+                        }
+                        Err(error) => {
+                            outputs.push(Some(Self::create_failure(call.jsonrpc, call.id, error)))
+                        }
+                    }
+                }
                 "getVersion" => {
                     outputs.push(Some(if let Err(error) = call.params.expect_no_params() {
-                        Self::create_failure(error, call.id)
+                        Self::create_failure(call.jsonrpc, call.id, error)
                     } else {
                         let version = solana_version::Version::default();
                         Self::create_success(
@@ -130,13 +186,14 @@ impl SolanaRpc {
                                 solana_core: version.to_string(),
                                 feature_set: Some(version.feature_set),
                             },
-                        )?
+                        )
                     }));
                 }
                 _ => {
                     outputs.push(Some(Self::create_failure(
-                        RpcError::method_not_found(),
+                        call.jsonrpc,
                         call.id,
+                        JsonrpcError::method_not_found(),
                     )));
                 }
             }
@@ -147,7 +204,6 @@ impl SolanaRpc {
             let (response_tx, response_rx) = oneshot::channel();
 
             match self.requests_tx.try_send(RpcRequests {
-                mode,
                 requests,
                 shutdown: Arc::clone(&shutdown),
                 response_tx,
@@ -174,9 +230,16 @@ impl SolanaRpc {
                     shutdown.store(true, Ordering::Relaxed);
                     anyhow::bail!("request timeout");
                 },
-                value = response_rx => {
-                    //
-                    todo!()
+                maybe_outputs = response_rx => {
+                    let mut index = 0;
+                    for output in maybe_outputs.map_err(|_error| anyhow::anyhow!("request dropped"))? {
+                        while index < outputs.len() && outputs[index].is_some() {
+                            index += 1;
+                        }
+                        anyhow::ensure!(index < outputs.len(), "output index out of bounds");
+
+                        outputs[index] = Some(output);
+                    }
                 }
             }
         }
@@ -185,12 +248,12 @@ impl SolanaRpc {
         match outputs
             .into_iter()
             .map(|output| output.ok_or(()))
-            .collect::<Result<Vec<RpcOutput>, ()>>()
+            .collect::<Result<Vec<JsonrpcOutput>, ()>>()
         {
             Ok(mut outputs) => serde_json::to_vec(&if batched_calls {
-                RpcResponse::Batch(outputs)
+                JsonrpcResponse::Batch(outputs)
             } else if let Some(output) = outputs.pop() {
-                RpcResponse::Single(output)
+                JsonrpcResponse::Single(output)
             } else {
                 anyhow::bail!("output is not defined")
             })
@@ -205,74 +268,160 @@ impl SolanaRpc {
         })
     }
 
-    fn create_success<R>(
-        jsonrpc: Option<RpcVersion>,
-        id: RpcId,
-        result: R,
-    ) -> anyhow::Result<RpcOutput>
+    fn create_success<R>(jsonrpc: Option<JsonrpcVersion>, id: JsonrpcId, result: R) -> JsonrpcOutput
     where
         R: Serialize,
     {
-        Ok(RpcOutput::Success(RpcSuccess {
+        JsonrpcOutput::Success(JsonrpcSuccess {
             jsonrpc,
-            result: serde_json::to_value(result)?,
-            id,
-        }))
-    }
-
-    const fn create_failure(error: RpcError, id: RpcId) -> RpcOutput {
-        RpcOutput::Failure(RpcFailure {
-            jsonrpc: Some(RpcVersion::V2),
-            error,
+            result: serde_json::to_value(result).expect("failed to serialize"),
             id,
         })
     }
 
+    const fn create_failure(
+        jsonrpc: Option<JsonrpcVersion>,
+        id: JsonrpcId,
+        error: JsonrpcError,
+    ) -> JsonrpcOutput {
+        JsonrpcOutput::Failure(JsonrpcFailure { jsonrpc, error, id })
+    }
+
     async fn run_loop(
-        mut rx: mpsc::UnboundedReceiver<Option<Arc<GeyserMessage>>>,
+        mut geyser_rx: mpsc::UnboundedReceiver<Option<Arc<GeyserMessage>>>,
+        mut requests_rx: mpsc::Receiver<RpcRequests>,
     ) -> anyhow::Result<()> {
         let mut latest_blockhash_storage = LatestBlockhashStorage::default();
 
-        while let Some(Some(message)) = rx.recv().await {
-            match message.as_ref() {
-                GeyserMessage::Slot { slot, commitment } => {
-                    latest_blockhash_storage.update_commitment(*slot, *commitment);
-                }
-                GeyserMessage::Block {
-                    slot,
-                    hash,
-                    // time,
-                    height,
-                    // parent_slot,
-                    // parent_hash,
-                    // transactions,
-                    ..
-                } => {
-                    latest_blockhash_storage.push_block(*slot, *height, *hash);
-                }
+        loop {
+            tokio::select! {
+                biased;
+
+                maybe_message = geyser_rx.recv() => match maybe_message {
+                    Some(Some(message)) => match message.as_ref() {
+                        GeyserMessage::Slot { slot, commitment } => {
+                            latest_blockhash_storage.update_commitment(*slot, *commitment);
+                        }
+                        GeyserMessage::Block {
+                            slot,
+                            hash,
+                            // time,
+                            height,
+                            // parent_slot,
+                            // parent_hash,
+                            // transactions,
+                            ..
+                        } => {
+                            latest_blockhash_storage.push_block(*slot, *height, *hash);
+                        }
+                    }
+                    _ => break,
+                },
+
+                maybe_rpc_requests = requests_rx.recv() => match maybe_rpc_requests {
+                    Some(rpc_requests) => {
+                        if rpc_requests.shutdown.load(Ordering::Relaxed) {
+                            continue;
+                        }
+
+                        let outputs = rpc_requests
+                            .requests
+                            .into_iter()
+                            .map(|request| {
+                                match request {
+                                    RpcRequest::GetLatestBlockhash { id, jsonrpc, commitment, rollback, min_context_slot } => {
+                                        if rollback > MAX_RECENT_BLOCKHASHES {
+                                            return Self::create_failure(jsonrpc, id, JsonrpcError::invalid_params("rollback exceeds 300"));
+                                        }
+
+                                        let mut slot = match commitment {
+                                            CommitmentLevel::Processed => latest_blockhash_storage.slot_processed,
+                                            CommitmentLevel::Confirmed => latest_blockhash_storage.slot_confirmed,
+                                            CommitmentLevel::Finalized => latest_blockhash_storage.slot_finalized,
+                                        };
+
+                                        if let Some(min_context_slot) = min_context_slot {
+                                            if slot < min_context_slot {
+                                                let error = RpcCustomError::MinContextSlotNotReached { context_slot: slot }.into();
+                                                return Self::create_failure(jsonrpc, id, error);
+                                            }
+                                        }
+
+                                        let Some(mut value) = latest_blockhash_storage.slots.get(&slot) else {
+                                            return Self::create_failure(jsonrpc, id, JsonrpcError::internal_error());
+                                        };
+                                        for _ in 0..rollback {
+                                            loop {
+                                                slot -= 1;
+                                                match latest_blockhash_storage.slots.get(&slot) {
+                                                    Some(prev_value) => {
+                                                        if prev_value.commitment == commitment {
+                                                            value = prev_value;
+                                                            break;
+                                                        }
+                                                    }
+                                                    _ => return Self::create_failure(jsonrpc, id, JsonrpcError::invalid_params("failed to rollback block")),
+                                                }
+                                            }
+                                        }
+
+                                        Self::create_success(jsonrpc, id, RpcResponse {
+                                            context: RpcResponseContext::new(slot),
+                                            value: RpcBlockhash {
+                                                blockhash: value.hash.to_string(),
+                                                last_valid_block_height: value.height + MAX_RECENT_BLOCKHASHES as u64,
+                                            },
+                                        })
+                                    }
+                                }
+                            })
+                            .collect::<Vec<JsonrpcOutput>>();
+
+                        let _ = rpc_requests.response_tx.send(outputs);
+                    },
+                    None => break,
+                },
             }
         }
+
         Ok(())
     }
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RpcLatestBlockhashConfig {
+    #[serde(flatten)]
+    pub context: RpcContextConfig,
+    #[serde(default)]
+    pub rollback: usize,
+}
+
 #[derive(Debug)]
 struct RpcRequests {
-    mode: SolanaRpcMode,
     requests: Vec<RpcRequest>,
     shutdown: Arc<AtomicBool>,
-    response_tx: oneshot::Sender<Vec<RpcOutput>>,
+    response_tx: oneshot::Sender<Vec<JsonrpcOutput>>,
 }
 
 #[derive(Debug)]
 enum RpcRequest {
-    // GetVersion { call: RpcMethodCall },
+    GetLatestBlockhash {
+        id: JsonrpcId,
+        jsonrpc: Option<JsonrpcVersion>,
+        commitment: CommitmentLevel,
+        rollback: usize,
+        min_context_slot: Option<Slot>,
+    },
 }
 
 #[derive(Debug, Default)]
 struct LatestBlockhashStorage {
     slots: BTreeMap<Slot, LatestBlockhashSlot>,
     finalized_total: usize,
+    slot_processed: Slot,
+    slot_confirmed: Slot,
+    slot_finalized: Slot,
 }
 
 impl LatestBlockhashStorage {
@@ -290,13 +439,23 @@ impl LatestBlockhashStorage {
     fn update_commitment(&mut self, slot: Slot, commitment: CommitmentLevel) {
         if let Some(value) = self.slots.get_mut(&slot) {
             value.commitment = commitment;
-            if commitment == CommitmentLevel::Finalized {
+
+            if commitment == CommitmentLevel::Processed && slot > self.slot_processed {
+                self.slot_processed = slot;
+            } else if commitment == CommitmentLevel::Confirmed {
+                self.slot_confirmed = slot;
+            } else if commitment == CommitmentLevel::Finalized {
                 self.finalized_total += 1;
+                self.slot_finalized = slot;
             }
         }
 
         while self.finalized_total > MAX_RECENT_BLOCKHASHES + 10 {
-            let _ = self.slots.pop_first();
+            if let Some((_slot, value)) = self.slots.pop_first() {
+                if value.commitment == CommitmentLevel::Finalized {
+                    self.finalized_total -= 1;
+                }
+            }
         }
     }
 }

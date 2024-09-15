@@ -3539,6 +3539,7 @@ dependencies = [
  "clap",
  "futures",
  "git-version",
+ "http 1.1.0",
  "http-body-util",
  "human-size",
  "humantime-serde",

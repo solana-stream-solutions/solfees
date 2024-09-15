@@ -16,6 +16,7 @@ bincode = { workspace = true }
 borsh = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 futures = { workspace = true }
+http = { workspace = true }
 http-body-util = { workspace = true }
 human-size = { workspace = true }
 humantime-serde = { workspace = true }

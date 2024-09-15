@@ -6,6 +6,9 @@ use {
     serde::{Deserialize, Serialize},
     solana_sdk::{
         clock::{Slot, UnixTimestamp},
+        commitment_config::{
+            CommitmentConfig as SolanaCommitmentConfig, CommitmentLevel as SolanaCommitmentLevel,
+        },
         compute_budget::{self, ComputeBudgetInstruction},
         ed25519_program,
         hash::Hash,
@@ -46,6 +49,22 @@ impl From<proto::CommitmentLevel> for CommitmentLevel {
             proto::CommitmentLevel::Processed => Self::Processed,
             proto::CommitmentLevel::Confirmed => Self::Confirmed,
             proto::CommitmentLevel::Finalized => Self::Finalized,
+        }
+    }
+}
+
+impl From<SolanaCommitmentConfig> for CommitmentLevel {
+    fn from(commitment: SolanaCommitmentConfig) -> Self {
+        commitment.commitment.into()
+    }
+}
+
+impl From<SolanaCommitmentLevel> for CommitmentLevel {
+    fn from(commitment: SolanaCommitmentLevel) -> Self {
+        match commitment {
+            SolanaCommitmentLevel::Processed => Self::Processed,
+            SolanaCommitmentLevel::Confirmed => Self::Confirmed,
+            SolanaCommitmentLevel::Finalized => Self::Finalized,
         }
     }
 }
