@@ -37,7 +37,7 @@ solana-sdk = { workspace = true }
 solana-transaction-status = { workspace = true }
 solana-version = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "fs", "signal"] }
-tokio-tungstenite = { workspace = true, features = ["tokio-rustls"] }
+tokio-tungstenite = { workspace = true, features = ["native-tls"] }
 tonic = { workspace = true, features = ["gzip"] }
 tower = { workspace = true }
 tracing = { workspace = true }
