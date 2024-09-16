@@ -92,6 +92,7 @@ pub async fn run_solfees(
                     let solana_rpc_mode = match req.uri().path() {
                         "/api/solana" => SolanaRpcMode::Solana,
                         "/api/solana/triton" => SolanaRpcMode::Triton,
+                        "/api/solfees" => SolanaRpcMode::SolFees,
                         "/api/solfees/ws" if is_upgrade_request(&req) => {
                             return match hyper_tungstenite::upgrade(
                                 &mut req,

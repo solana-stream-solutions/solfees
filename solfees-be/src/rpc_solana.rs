@@ -54,7 +54,7 @@ const MAX_NUM_RECENT_SLOT_INFO: usize = 150;
 pub enum SolanaRpcMode {
     Solana,
     Triton,
-    // Extended,
+    SolFees,
 }
 
 #[derive(Debug, Clone)]
@@ -153,7 +153,7 @@ impl SolanaRpc {
             };
 
             match call.method.as_str() {
-                "getLatestBlockhash" => {
+                "getLatestBlockhash" if mode != SolanaRpcMode::SolFees => {
                     let parsed_params = match mode {
                         SolanaRpcMode::Solana => {
                             #[derive(Debug, Deserialize)]
@@ -183,6 +183,7 @@ impl SolanaRpc {
                                 (context.commitment, rollback, context.min_context_slot)
                             })
                         }
+                        SolanaRpcMode::SolFees => unreachable!(),
                     };
 
                     outputs.push(match parsed_params {
@@ -199,7 +200,7 @@ impl SolanaRpc {
                         Err(error) => Some(Self::create_failure(call.jsonrpc, call.id, error)),
                     });
                 }
-                "getRecentPrioritizationFees" => {
+                "getRecentPrioritizationFees" if mode != SolanaRpcMode::SolFees => {
                     let parsed_params = match mode {
                         SolanaRpcMode::Solana => {
                             #[derive(Debug, Deserialize)]
@@ -243,6 +244,7 @@ impl SolanaRpc {
                                 },
                             )
                         }
+                        SolanaRpcMode::SolFees => unreachable!(),
                     };
 
                     outputs.push(match parsed_params {
@@ -258,7 +260,7 @@ impl SolanaRpc {
                         Err(error) => Some(Self::create_failure(call.jsonrpc, call.id, error)),
                     })
                 }
-                "getSlot" => {
+                "getSlot" if mode != SolanaRpcMode::SolFees => {
                     #[derive(Debug, Deserialize)]
                     struct ReqParams {
                         #[serde(default)]
@@ -286,7 +288,7 @@ impl SolanaRpc {
                         },
                     )
                 }
-                "getVersion" => {
+                "getVersion" if mode != SolanaRpcMode::SolFees => {
                     outputs.push(Some(if let Err(error) = call.params.expect_no_params() {
                         Self::create_failure(call.jsonrpc, call.id, error)
                     } else {
@@ -301,6 +303,24 @@ impl SolanaRpc {
                         )
                     }));
                 }
+                "getSlots" if mode == SolanaRpcMode::SolFees => outputs.push(
+                    match call
+                        .params
+                        .parse()
+                        .and_then(|ReqParamsSlotsSubscribe { config }| {
+                            config.unwrap_or_default().try_into()
+                        }) {
+                        Ok(filter) => {
+                            requests.push(RpcRequest::Slots {
+                                jsonrpc: call.jsonrpc,
+                                id: call.id,
+                                filter,
+                            });
+                            None
+                        }
+                        Err(error) => Some(Self::create_failure(call.jsonrpc, call.id, error)),
+                    },
+                ),
                 _ => {
                     outputs.push(Some(Self::create_failure(
                         call.jsonrpc,
@@ -644,6 +664,10 @@ impl SolanaRpc {
 
                                         Self::create_success(jsonrpc, id, slot)
                                     }
+                                    RpcRequest::Slots { jsonrpc, id, filter } => {
+                                        let outputs = slots_info.values().map(|info| info.get_filtered(&filter)).collect::<Vec<_>>();
+                                        Self::create_success(jsonrpc, id, outputs)
+                                    }
                                 }
                             })
                             .collect::<Vec<JsonrpcOutput>>();
@@ -721,6 +745,11 @@ enum RpcRequest {
         id: JsonrpcId,
         commitment: CommitmentLevel,
         min_context_slot: Option<Slot>,
+    },
+    Slots {
+        jsonrpc: Option<JsonrpcVersion>,
+        id: JsonrpcId,
+        filter: SlotSubscribeFilter,
     },
 }
 
@@ -854,6 +883,7 @@ impl StreamsSlotInfo {
         SlotsSubscribeOutput::Slot {
             identity: self.identity.to_string(),
             slot: self.slot,
+            commitment: self.commitment,
             hash: self.hash.to_string(),
             time: self.time,
             height: self.height,
@@ -1032,6 +1062,7 @@ enum SlotsSubscribeOutput {
     Slot {
         identity: String,
         slot: Slot,
+        commitment: CommitmentLevel,
         hash: String,
         time: UnixTimestamp,
         height: Slot,
