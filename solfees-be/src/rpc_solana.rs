@@ -154,7 +154,7 @@ impl SolanaRpc {
             };
 
             match call.method.as_str() {
-                "getLatestBlockhash" if mode != SolanaRpcMode::SolfeesFrontend => {
+                "getLatestBlockhash" => {
                     let parsed_params = match mode {
                         SolanaRpcMode::Solana => {
                             #[derive(Debug, Deserialize)]
@@ -171,7 +171,9 @@ impl SolanaRpc {
                                 (commitment, 0, min_context_slot)
                             })
                         }
-                        SolanaRpcMode::Triton | SolanaRpcMode::Solfees => {
+                        SolanaRpcMode::Triton
+                        | SolanaRpcMode::Solfees
+                        | SolanaRpcMode::SolfeesFrontend => {
                             #[derive(Debug, Deserialize)]
                             struct ReqParams {
                                 #[serde(default)]
@@ -184,7 +186,6 @@ impl SolanaRpc {
                                 (context.commitment, rollback, context.min_context_slot)
                             })
                         }
-                        SolanaRpcMode::SolfeesFrontend => unreachable!(),
                     };
 
                     outputs.push(match parsed_params {
@@ -201,7 +202,7 @@ impl SolanaRpc {
                         Err(error) => Some(Self::create_failure(call.jsonrpc, call.id, error)),
                     });
                 }
-                "getRecentPrioritizationFees" if mode != SolanaRpcMode::SolfeesFrontend => {
+                "getRecentPrioritizationFees" => {
                     let maybe_parsed_params = match mode {
                         SolanaRpcMode::Solana => {
                             #[derive(Debug, Deserialize)]
@@ -245,7 +246,7 @@ impl SolanaRpc {
                                 },
                             ))
                         }
-                        SolanaRpcMode::Solfees => {
+                        SolanaRpcMode::Solfees | SolanaRpcMode::SolfeesFrontend => {
                             outputs.push(
                                 match call.params.parse().and_then(
                                     |ReqParamsSlotsSubscribe { config }| {
@@ -253,11 +254,11 @@ impl SolanaRpc {
                                     },
                                 ) {
                                     Ok(filter) => {
-                                        requests.push(RpcRequest::Slots {
+                                        requests.push(RpcRequest::SolfeesSlots {
                                             jsonrpc: call.jsonrpc,
                                             id: call.id.clone(),
                                             filter,
-                                            frontend: false,
+                                            frontend: mode == SolanaRpcMode::SolfeesFrontend,
                                         });
                                         None
                                     }
@@ -271,7 +272,6 @@ impl SolanaRpc {
 
                             None
                         }
-                        SolanaRpcMode::SolfeesFrontend => unreachable!(),
                     };
 
                     if let Some(parsed_params) = maybe_parsed_params {
@@ -289,7 +289,7 @@ impl SolanaRpc {
                         })
                     }
                 }
-                "getSlot" if mode != SolanaRpcMode::SolfeesFrontend => {
+                "getSlot" => {
                     #[derive(Debug, Deserialize)]
                     struct ReqParams {
                         #[serde(default)]
@@ -332,25 +332,6 @@ impl SolanaRpc {
                         )
                     }));
                 }
-                "getSlots" if mode == SolanaRpcMode::SolfeesFrontend => outputs.push(
-                    match call
-                        .params
-                        .parse()
-                        .and_then(|ReqParamsSlotsSubscribe { config }| {
-                            config.unwrap_or_default().try_into()
-                        }) {
-                        Ok(filter) => {
-                            requests.push(RpcRequest::Slots {
-                                jsonrpc: call.jsonrpc,
-                                id: call.id,
-                                filter,
-                                frontend: true,
-                            });
-                            None
-                        }
-                        Err(error) => Some(Self::create_failure(call.jsonrpc, call.id, error)),
-                    },
-                ),
                 _ => {
                     outputs.push(Some(Self::create_failure(
                         call.jsonrpc,
@@ -430,7 +411,13 @@ impl SolanaRpc {
         })
     }
 
-    pub async fn on_websocket(self, websocket: HyperWebsocket) {
+    pub async fn on_websocket(self, mode: SolanaRpcMode, websocket: HyperWebsocket) {
+        let ws_frontend = match mode {
+            SolanaRpcMode::Solfees => false,
+            SolanaRpcMode::SolfeesFrontend => true,
+            _ => return,
+        };
+
         let (mut websocket_tx, mut websocket_rx) = match websocket.await {
             Ok(websocket) => websocket.split(),
             Err(error) => {
@@ -515,7 +502,7 @@ impl SolanaRpc {
                     Ok(update) => if let Some((id, filter)) = filter.as_ref() {
                         let output = match update.as_ref() {
                             StreamsUpdateMessage::Status { slot, commitment } => {
-                                if *commitment == CommitmentLevel::Processed{
+                                if *commitment == CommitmentLevel::Processed {
                                     continue;
                                 }
 
@@ -526,7 +513,11 @@ impl SolanaRpc {
                             },
                             StreamsUpdateMessage::Slot { info } => info.get_filtered(filter),
                         };
-                        let message = Self::create_success(None, id.clone(), output);
+                        let message = if ws_frontend {
+                            Self::create_success(None, id.clone(), output)
+                        } else {
+                            Self::create_success(None, id.clone(), SlotsSubscribeOutputSolana::from(output))
+                        };
                         websocket_tx_message = Some(WebSocketMessage::Text(serde_json::to_string(&message).expect("failed to serialize")));
                     }
                     Err(broadcast::error::RecvError::Closed) => break Some(None),
@@ -694,7 +685,7 @@ impl SolanaRpc {
 
                                         Self::create_success(jsonrpc, id, slot)
                                     }
-                                    RpcRequest::Slots { jsonrpc, id, filter, frontend } => {
+                                    RpcRequest::SolfeesSlots { jsonrpc, id, filter, frontend } => {
                                         let outputs = slots_info.values().map(|info| info.get_filtered(&filter));
                                         if frontend {
                                             Self::create_success(jsonrpc, id, outputs.collect::<Vec<_>>())
@@ -786,7 +777,7 @@ enum RpcRequest {
         commitment: CommitmentLevel,
         min_context_slot: Option<Slot>,
     },
-    Slots {
+    SolfeesSlots {
         jsonrpc: Option<JsonrpcVersion>,
         id: JsonrpcId,
         filter: SlotSubscribeFilter,
@@ -1115,6 +1106,43 @@ enum SlotsSubscribeOutput {
         total_fee: u64,
         total_units_consumed: u64,
     },
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+enum SlotsSubscribeOutputSolana {
+    Status {
+        slot: Slot,
+        commitment: CommitmentLevel,
+    },
+    Slot {
+        slot: Slot,
+        commitment: CommitmentLevel,
+        fee_average: f64,
+        fee_levels: Vec<Option<u64>>,
+    },
+}
+
+impl From<SlotsSubscribeOutput> for SlotsSubscribeOutputSolana {
+    fn from(output: SlotsSubscribeOutput) -> Self {
+        match output {
+            SlotsSubscribeOutput::Status { slot, commitment } => {
+                SlotsSubscribeOutputSolana::Status { slot, commitment }
+            }
+            SlotsSubscribeOutput::Slot {
+                slot,
+                commitment,
+                fee_average,
+                fee_levels,
+                ..
+            } => SlotsSubscribeOutputSolana::Slot {
+                slot,
+                commitment,
+                fee_average,
+                fee_levels,
+            },
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]

@@ -4,9 +4,7 @@ use {
         rpc_solana::{SolanaRpc, SolanaRpcMode},
     },
     futures::future::TryFutureExt,
-    http_body_util::{
-        combinators::BoxBody, BodyExt, Empty as BodyEmpty, Full as BodyFull, Limited,
-    },
+    http_body_util::{BodyExt, Empty as BodyEmpty, Full as BodyFull, Limited},
     hyper::{
         body::{Bytes, Incoming as BodyIncoming},
         header::CONTENT_TYPE,
@@ -18,7 +16,7 @@ use {
         rt::tokio::{TokioExecutor, TokioIo},
         server::{conn::auto::Builder as ServerBuilder, graceful::GracefulShutdown},
     },
-    std::{convert::Infallible, net::SocketAddr, sync::Arc},
+    std::{net::SocketAddr, sync::Arc},
     tokio::{
         net::TcpListener,
         sync::{broadcast, Notify},
@@ -89,29 +87,25 @@ pub async fn run_solfees(
                 let solana_rpc = solana_rpc.clone();
                 let shutdown_rx = shutdown_rx.resubscribe();
                 async move {
-                    let solana_rpc_mode = match req.uri().path() {
-                        "/api/solana" => SolanaRpcMode::Solana,
-                        "/api/solana/triton" => SolanaRpcMode::Triton,
-                        "/api/solana/solfees" => SolanaRpcMode::Solfees,
-                        "/api/solfees" => SolanaRpcMode::SolfeesFrontend,
-                        "/api/solfees/ws" if is_upgrade_request(&req) => {
-                            return match hyper_tungstenite::upgrade(
-                                &mut req,
-                                Some(WebSocketConfig {
-                                    max_message_size: Some(64 * 1024), // max incoming message size: 64KiB
-                                    ..Default::default()
-                                }),
-                            ) {
-                                Ok((response, websocket)) => {
-                                    tokio::spawn(solana_rpc.on_websocket(websocket));
-                                    let (parts, body) = response.into_parts();
-                                    Ok(Response::from_parts(parts, body.boxed()))
-                                }
-                                Err(error) => Response::builder()
-                                    .status(StatusCode::BAD_REQUEST)
-                                    .body(BodyFull::new(Bytes::from(format!("{error:?}"))).boxed()),
-                            };
+                    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+                    enum ReqType {
+                        Rpc,
+                        WebSocket,
+                    }
+
+                    let (req_type, solana_rpc_mode) = match req.uri().path() {
+                        "/api/solana" => (ReqType::Rpc, SolanaRpcMode::Solana),
+                        "/api/solana/triton" => (ReqType::Rpc, SolanaRpcMode::Triton),
+                        "/api/solana/solfees" => (ReqType::Rpc, SolanaRpcMode::Solfees),
+                        "/api/solana/solfees/ws" if is_upgrade_request(&req) => {
+                            (ReqType::WebSocket, SolanaRpcMode::Solfees)
                         }
+
+                        "/api/solfees" => (ReqType::Rpc, SolanaRpcMode::SolfeesFrontend),
+                        "/api/solfees/ws" if is_upgrade_request(&req) => {
+                            (ReqType::WebSocket, SolanaRpcMode::SolfeesFrontend)
+                        }
+
                         _ => {
                             return Response::builder()
                                 .status(StatusCode::NOT_FOUND)
@@ -119,7 +113,49 @@ pub async fn run_solfees(
                         }
                     };
 
-                    call_solana_rpc(solana_rpc, solana_rpc_mode, req, body_limit, shutdown_rx).await
+                    match req_type {
+                        ReqType::Rpc => {
+                            match Limited::new(req.into_body(), body_limit)
+                                .collect()
+                                .map_err(|error| anyhow::anyhow!(error))
+                                .and_then(|body| {
+                                    solana_rpc.on_request(
+                                        solana_rpc_mode,
+                                        body.aggregate(),
+                                        shutdown_rx,
+                                    )
+                                })
+                                .await
+                            {
+                                Ok(body) => Response::builder()
+                                    .header(CONTENT_TYPE, "application/json; charset=utf-8")
+                                    .body(BodyFull::new(Bytes::from(body)).boxed()),
+                                Err(error) => Response::builder()
+                                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                    .body(BodyFull::new(Bytes::from(format!("{error}"))).boxed()),
+                            }
+                        }
+                        ReqType::WebSocket => {
+                            match hyper_tungstenite::upgrade(
+                                &mut req,
+                                Some(WebSocketConfig {
+                                    max_message_size: Some(64 * 1024), // max incoming message size: 64KiB
+                                    ..Default::default()
+                                }),
+                            ) {
+                                Ok((response, websocket)) => {
+                                    tokio::spawn(
+                                        solana_rpc.on_websocket(solana_rpc_mode, websocket),
+                                    );
+                                    let (parts, body) = response.into_parts();
+                                    Ok(Response::from_parts(parts, body.boxed()))
+                                }
+                                Err(error) => Response::builder()
+                                    .status(StatusCode::BAD_REQUEST)
+                                    .body(BodyFull::new(Bytes::from(format!("{error:?}"))).boxed()),
+                            }
+                        }
+                    }
                 }
             }),
         );
@@ -135,26 +171,4 @@ pub async fn run_solfees(
     graceful.shutdown().await;
 
     Ok::<(), anyhow::Error>(())
-}
-
-async fn call_solana_rpc(
-    solana_rpc: SolanaRpc,
-    solana_mode: SolanaRpcMode,
-    request: Request<BodyIncoming>,
-    body_limit: usize,
-    shutdown_tx: broadcast::Receiver<()>,
-) -> http::Result<Response<BoxBody<Bytes, Infallible>>> {
-    match Limited::new(request.into_body(), body_limit)
-        .collect()
-        .map_err(|error| anyhow::anyhow!(error))
-        .and_then(|body| solana_rpc.on_request(solana_mode, body.aggregate(), shutdown_tx))
-        .await
-    {
-        Ok(body) => Response::builder()
-            .header(CONTENT_TYPE, "application/json; charset=utf-8")
-            .body(BodyFull::new(Bytes::from(body)).boxed()),
-        Err(error) => Response::builder()
-            .status(StatusCode::INTERNAL_SERVER_ERROR)
-            .body(BodyFull::new(Bytes::from(format!("{error}"))).boxed()),
-    }
 }
