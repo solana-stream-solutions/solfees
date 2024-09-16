@@ -54,7 +54,8 @@ const MAX_NUM_RECENT_SLOT_INFO: usize = 150;
 pub enum SolanaRpcMode {
     Solana,
     Triton,
-    SolFees,
+    Solfees,
+    SolfeesFrontend,
 }
 
 #[derive(Debug, Clone)]
@@ -153,7 +154,7 @@ impl SolanaRpc {
             };
 
             match call.method.as_str() {
-                "getLatestBlockhash" if mode != SolanaRpcMode::SolFees => {
+                "getLatestBlockhash" if mode != SolanaRpcMode::SolfeesFrontend => {
                     let parsed_params = match mode {
                         SolanaRpcMode::Solana => {
                             #[derive(Debug, Deserialize)]
@@ -170,7 +171,7 @@ impl SolanaRpc {
                                 (commitment, 0, min_context_slot)
                             })
                         }
-                        SolanaRpcMode::Triton => {
+                        SolanaRpcMode::Triton | SolanaRpcMode::Solfees => {
                             #[derive(Debug, Deserialize)]
                             struct ReqParams {
                                 #[serde(default)]
@@ -183,7 +184,7 @@ impl SolanaRpc {
                                 (context.commitment, rollback, context.min_context_slot)
                             })
                         }
-                        SolanaRpcMode::SolFees => unreachable!(),
+                        SolanaRpcMode::SolfeesFrontend => unreachable!(),
                     };
 
                     outputs.push(match parsed_params {
@@ -200,8 +201,8 @@ impl SolanaRpc {
                         Err(error) => Some(Self::create_failure(call.jsonrpc, call.id, error)),
                     });
                 }
-                "getRecentPrioritizationFees" if mode != SolanaRpcMode::SolFees => {
-                    let parsed_params = match mode {
+                "getRecentPrioritizationFees" if mode != SolanaRpcMode::SolfeesFrontend => {
+                    let maybe_parsed_params = match mode {
                         SolanaRpcMode::Solana => {
                             #[derive(Debug, Deserialize)]
                             struct ReqParams {
@@ -209,9 +210,9 @@ impl SolanaRpc {
                                 pubkey_strs: Option<Vec<String>>,
                             }
 
-                            call.params.parse().and_then(|ReqParams { pubkey_strs }| {
+                            Some(call.params.parse().and_then(|ReqParams { pubkey_strs }| {
                                 Ok((verify_pubkeys(pubkey_strs)?, None))
-                            })
+                            }))
                         }
                         SolanaRpcMode::Triton => {
                             #[derive(Debug, Deserialize)]
@@ -222,7 +223,7 @@ impl SolanaRpc {
                                 config: Option<RpcRecentPrioritizationFeesConfigTriton>,
                             }
 
-                            call.params.parse().and_then(
+                            Some(call.params.parse().and_then(
                                 |ReqParams {
                                      pubkey_strs,
                                      config,
@@ -242,25 +243,53 @@ impl SolanaRpc {
 
                                     Ok((pubkeys, percentile))
                                 },
-                            )
+                            ))
                         }
-                        SolanaRpcMode::SolFees => unreachable!(),
-                    };
+                        SolanaRpcMode::Solfees => {
+                            outputs.push(
+                                match call.params.parse().and_then(
+                                    |ReqParamsSlotsSubscribe { config }| {
+                                        config.unwrap_or_default().try_into()
+                                    },
+                                ) {
+                                    Ok(filter) => {
+                                        requests.push(RpcRequest::Slots {
+                                            jsonrpc: call.jsonrpc,
+                                            id: call.id.clone(),
+                                            filter,
+                                            frontend: false,
+                                        });
+                                        None
+                                    }
+                                    Err(error) => Some(Self::create_failure(
+                                        call.jsonrpc,
+                                        call.id.clone(),
+                                        error,
+                                    )),
+                                },
+                            );
 
-                    outputs.push(match parsed_params {
-                        Ok((pubkeys, percentile)) => {
-                            requests.push(RpcRequest::RecentPrioritizationFees {
-                                jsonrpc: call.jsonrpc,
-                                id: call.id,
-                                pubkeys,
-                                percentile,
-                            });
                             None
                         }
-                        Err(error) => Some(Self::create_failure(call.jsonrpc, call.id, error)),
-                    })
+                        SolanaRpcMode::SolfeesFrontend => unreachable!(),
+                    };
+
+                    if let Some(parsed_params) = maybe_parsed_params {
+                        outputs.push(match parsed_params {
+                            Ok((pubkeys, percentile)) => {
+                                requests.push(RpcRequest::RecentPrioritizationFees {
+                                    jsonrpc: call.jsonrpc,
+                                    id: call.id,
+                                    pubkeys,
+                                    percentile,
+                                });
+                                None
+                            }
+                            Err(error) => Some(Self::create_failure(call.jsonrpc, call.id, error)),
+                        })
+                    }
                 }
-                "getSlot" if mode != SolanaRpcMode::SolFees => {
+                "getSlot" if mode != SolanaRpcMode::SolfeesFrontend => {
                     #[derive(Debug, Deserialize)]
                     struct ReqParams {
                         #[serde(default)]
@@ -288,7 +317,7 @@ impl SolanaRpc {
                         },
                     )
                 }
-                "getVersion" if mode != SolanaRpcMode::SolFees => {
+                "getVersion" if mode != SolanaRpcMode::SolfeesFrontend => {
                     outputs.push(Some(if let Err(error) = call.params.expect_no_params() {
                         Self::create_failure(call.jsonrpc, call.id, error)
                     } else {
@@ -303,7 +332,7 @@ impl SolanaRpc {
                         )
                     }));
                 }
-                "getSlots" if mode == SolanaRpcMode::SolFees => outputs.push(
+                "getSlots" if mode == SolanaRpcMode::SolfeesFrontend => outputs.push(
                     match call
                         .params
                         .parse()
@@ -315,6 +344,7 @@ impl SolanaRpc {
                                 jsonrpc: call.jsonrpc,
                                 id: call.id,
                                 filter,
+                                frontend: true,
                             });
                             None
                         }
@@ -664,9 +694,19 @@ impl SolanaRpc {
 
                                         Self::create_success(jsonrpc, id, slot)
                                     }
-                                    RpcRequest::Slots { jsonrpc, id, filter } => {
-                                        let outputs = slots_info.values().map(|info| info.get_filtered(&filter)).collect::<Vec<_>>();
-                                        Self::create_success(jsonrpc, id, outputs)
+                                    RpcRequest::Slots { jsonrpc, id, filter, frontend } => {
+                                        let outputs = slots_info.values().map(|info| info.get_filtered(&filter));
+                                        if frontend {
+                                            Self::create_success(jsonrpc, id, outputs.collect::<Vec<_>>())
+                                        } else {
+                                            match outputs
+                                                .map(SolfeesPrioritizationFee::try_from)
+                                                .collect::<Result<Vec<_>, JsonrpcError>>()
+                                            {
+                                                Ok(outputs) => Self::create_success(jsonrpc, id, outputs),
+                                                Err(error) => Self::create_failure(jsonrpc, id, error),
+                                            }
+                                        }
                                     }
                                 }
                             })
@@ -750,6 +790,7 @@ enum RpcRequest {
         jsonrpc: Option<JsonrpcVersion>,
         id: JsonrpcId,
         filter: SlotSubscribeFilter,
+        frontend: bool,
     },
 }
 
@@ -1074,4 +1115,35 @@ enum SlotsSubscribeOutput {
         total_fee: u64,
         total_units_consumed: u64,
     },
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SolfeesPrioritizationFee {
+    slot: Slot,
+    commitment: CommitmentLevel,
+    fee_average: f64,
+    fee_levels: Vec<Option<u64>>,
+}
+
+impl TryFrom<SlotsSubscribeOutput> for SolfeesPrioritizationFee {
+    type Error = JsonrpcError;
+
+    fn try_from(output: SlotsSubscribeOutput) -> Result<Self, Self::Error> {
+        match output {
+            SlotsSubscribeOutput::Status { .. } => Err(JsonrpcError::internal_error()),
+            SlotsSubscribeOutput::Slot {
+                slot,
+                commitment,
+                fee_average,
+                fee_levels,
+                ..
+            } => Ok(SolfeesPrioritizationFee {
+                slot,
+                commitment,
+                fee_average,
+                fee_levels,
+            }),
+        }
+    }
 }
