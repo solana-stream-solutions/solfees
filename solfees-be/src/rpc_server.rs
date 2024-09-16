@@ -13,6 +13,7 @@ use {
         service::service_fn,
         Request, Response, StatusCode,
     },
+    hyper_tungstenite::{is_upgrade_request, tungstenite::protocol::WebSocketConfig},
     hyper_util::{
         rt::tokio::{TokioExecutor, TokioIo},
         server::{conn::auto::Builder as ServerBuilder, graceful::GracefulShutdown},
@@ -82,15 +83,33 @@ pub async fn run_solfees(
 
         let solana_rpc = solana_rpc.clone();
         let (shutdown_tx, shutdown_rx) = broadcast::channel(1);
-        let connection = http.serve_connection(
+        let connection = http.serve_connection_with_upgrades(
             TokioIo::new(Box::pin(stream)),
-            service_fn(move |req: Request<BodyIncoming>| {
+            service_fn(move |mut req: Request<BodyIncoming>| {
                 let solana_rpc = solana_rpc.clone();
                 let shutdown_rx = shutdown_rx.resubscribe();
                 async move {
                     let solana_rpc_mode = match req.uri().path() {
                         "/api/solana" => SolanaRpcMode::Solana,
                         "/api/solana/triton" => SolanaRpcMode::Triton,
+                        "/api/solfees/ws" if is_upgrade_request(&req) => {
+                            return match hyper_tungstenite::upgrade(
+                                &mut req,
+                                Some(WebSocketConfig {
+                                    max_message_size: Some(64 * 1024), // max incoming message size: 64KiB
+                                    ..Default::default()
+                                }),
+                            ) {
+                                Ok((response, websocket)) => {
+                                    tokio::spawn(solana_rpc.on_websocket(websocket));
+                                    let (parts, body) = response.into_parts();
+                                    Ok(Response::from_parts(parts, body.boxed()))
+                                }
+                                Err(error) => Response::builder()
+                                    .status(StatusCode::BAD_REQUEST)
+                                    .body(BodyFull::new(Bytes::from(format!("{error:?}"))).boxed()),
+                            };
+                        }
                         _ => {
                             return Response::builder()
                                 .status(StatusCode::NOT_FOUND)
@@ -105,9 +124,7 @@ pub async fn run_solfees(
         let fut = graceful.watch(connection.into_owned());
 
         tokio::spawn(async move {
-            if let Err(error) = fut.await {
-                error!(%error, "failed to handle connection");
-            }
+            let _ = fut.await;
             drop(shutdown_tx);
         });
     }

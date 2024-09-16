@@ -14,3 +14,4 @@ listen_rpc:
   body_limit: 50KiB
   request_timeout: 60s
   request_queue_max: 1000
+  streams_channel_capacity: 150

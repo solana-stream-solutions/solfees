@@ -98,7 +98,7 @@ async fn main2(config: Config) -> anyhow::Result<()> {
 
         metrics::redis_messages_pushed_inc_by(messages.len());
         for message in messages {
-            if let GeyserMessage::Slot { slot, commitment } = message {
+            if let GeyserMessage::Status { slot, commitment } = message {
                 metrics::redis_slot_pushed_set(commitment, slot);
             }
         }

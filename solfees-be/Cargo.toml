@@ -21,6 +21,7 @@ http-body-util = { workspace = true }
 human-size = { workspace = true }
 humantime-serde = { workspace = true }
 hyper = { workspace = true }
+hyper-tungstenite = { workspace = true }
 hyper-util = { workspace = true, features = ["server-auto", "server-graceful"] }
 jsonrpc-core = { workspace = true }
 lazy_static = { workspace = true }
@@ -36,6 +37,7 @@ solana-sdk = { workspace = true }
 solana-transaction-status = { workspace = true }
 solana-version = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "fs", "signal"] }
+tokio-tungstenite = { workspace = true, features = ["tokio-rustls"] }
 tonic = { workspace = true, features = ["gzip"] }
 tower = { workspace = true }
 tracing = { workspace = true }

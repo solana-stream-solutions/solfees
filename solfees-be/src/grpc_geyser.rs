@@ -39,6 +39,7 @@ use {
 };
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum CommitmentLevel {
     Processed,
     Confirmed,
@@ -84,7 +85,7 @@ impl CommitmentLevel {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct GeyserTransactionAccounts {
-    pub writeable: Vec<Pubkey>,
+    pub writable: Vec<Pubkey>,
     pub readable: Vec<Pubkey>,
     pub signers: Vec<Pubkey>,
     pub fee_payer: Pubkey,
@@ -98,7 +99,7 @@ impl From<(VersionedMessage, TransactionStatusMeta)> for GeyserTransactionAccoun
         // See details in `solana_program`:
         // https://docs.rs/solana-program/2.0.8/src/solana_program/message/compiled_keys.rs.html#103-113
 
-        let mut writeable = meta
+        let mut writable = meta
             .loaded_addresses
             .writable
             .into_iter()
@@ -118,7 +119,7 @@ impl From<(VersionedMessage, TransactionStatusMeta)> for GeyserTransactionAccoun
             .collect::<HashSet<_>>()
             .into_iter()
             .collect::<Vec<_>>();
-        writeable.sort_unstable();
+        writable.sort_unstable();
 
         let mut readable = meta
             .loaded_addresses
@@ -153,7 +154,7 @@ impl From<(VersionedMessage, TransactionStatusMeta)> for GeyserTransactionAccoun
         signers.sort_unstable();
 
         Self {
-            writeable,
+            writable,
             readable,
             signers,
             fee_payer: static_account_keys[0],
@@ -248,11 +249,11 @@ impl From<(VersionedTransactionWithStatusMeta, bool)> for GeyserTransaction {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum GeyserMessage {
-    Slot {
+    Status {
         slot: Slot,
         commitment: CommitmentLevel,
     },
-    Block {
+    Slot {
         slot: Slot,
         hash: Hash,
         time: UnixTimestamp,
@@ -268,7 +269,7 @@ impl GeyserMessage {
         info: SubscribeUpdateBlockMeta,
         transactions: Vec<GeyserTransaction>,
     ) -> anyhow::Result<GeyserMessage> {
-        Ok(GeyserMessage::Block {
+        Ok(GeyserMessage::Slot {
             slot: info.slot,
             hash: info
                 .blockhash
@@ -351,7 +352,7 @@ where
                                 }
                             }
 
-                            GeyserMessage::Slot {
+                            GeyserMessage::Status {
                                 slot: info.slot,
                                 commitment,
                             }

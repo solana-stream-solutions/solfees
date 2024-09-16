@@ -18,10 +18,11 @@ async fn main2(config: Config) -> anyhow::Result<()> {
         config.listen_rpc.request_calls_max,
         config.listen_rpc.request_timeout,
         config.listen_rpc.request_queue_max,
+        config.listen_rpc.streams_channel_capacity,
     );
     let solana_rpc_fut = tokio::spawn(solana_rpc_fut)
         .map(|result| result?)
-        .map_err(|error| error.context("SolanaRPC loop failed"))
+        .map_err(|error| error.context("SolanaRPC update loop failed"))
         .boxed();
 
     let rpc_admin_shutdown = Arc::new(Notify::new());
@@ -69,8 +70,7 @@ async fn main2(config: Config) -> anyhow::Result<()> {
             }
             value = redis_rx.recv() => {
                 if let Some(maybe_message) = value {
-                    let message = Arc::new(maybe_message?);
-                    solana_rpc.push_geyser_message(message)?;
+                    solana_rpc.push_geyser_message(maybe_message?)?;
                 } else {
                     error!("redis stream finished");
                     break;

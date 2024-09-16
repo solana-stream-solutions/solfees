@@ -137,6 +137,7 @@ pub struct ConfigListenRpc {
     #[serde(with = "humantime_serde")]
     pub request_timeout: Duration,
     pub request_queue_max: usize,
+    pub streams_channel_capacity: usize,
 }
 
 impl Default for ConfigListenRpc {
@@ -147,6 +148,7 @@ impl Default for ConfigListenRpc {
             request_calls_max: 100,
             request_timeout: Duration::from_secs(60),
             request_queue_max: 1_000,
+            streams_channel_capacity: 150,
         }
     }
 }

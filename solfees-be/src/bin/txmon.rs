@@ -21,13 +21,13 @@ async fn main() -> anyhow::Result<()> {
     let mut rx = solfees_be::grpc_geyser::subscribe(args.endpoint, args.x_token).await?;
     while let Some(message) = rx.recv().await {
         match message? {
-            GeyserMessage::Slot {
+            GeyserMessage::Status {
                 slot: _,
                 commitment: _,
             } => {
                 //
             }
-            GeyserMessage::Block {
+            GeyserMessage::Slot {
                 slot,
                 hash: _,
                 time: _,
