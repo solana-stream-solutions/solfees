@@ -867,6 +867,7 @@ impl StreamsSlotInfo {
 
         let total_units_consumed = transactions
             .iter()
+            .filter(|tx| !tx.vote)
             .map(|tx| tx.units_consumed.unwrap_or_default())
             .sum::<u64>();
 
