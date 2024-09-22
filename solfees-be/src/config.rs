@@ -5,6 +5,7 @@ use {
         Deserialize,
     },
     std::{
+        fmt,
         net::{IpAddr, Ipv4Addr, SocketAddr},
         str::FromStr,
         time::Duration,
@@ -45,7 +46,9 @@ impl Default for ConfigTracing {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct ConfigGrpc {
+    #[serde(deserialize_with = "deserialize_maybe_env")]
     pub endpoint: String,
+    #[serde(deserialize_with = "deserialize_option_maybe_env")]
     pub x_token: Option<String>,
 }
 
@@ -81,7 +84,7 @@ impl Default for ConfigRedisPublisher {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct ConfigListenAdmin {
-    #[serde(deserialize_with = "deserialize_listen")]
+    #[serde(deserialize_with = "deserialize_maybe_env")]
     pub bind: SocketAddr,
 }
 
@@ -129,7 +132,7 @@ impl Default for ConfigRedisConsumer {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct ConfigListenRpc {
-    #[serde(deserialize_with = "deserialize_listen")]
+    #[serde(deserialize_with = "deserialize_maybe_env")]
     pub bind: SocketAddr,
     #[serde(deserialize_with = "deserialize_humansize")]
     pub body_limit: usize,
@@ -153,34 +156,6 @@ impl Default for ConfigListenRpc {
     }
 }
 
-fn deserialize_listen<'de, D>(deserializer: D) -> Result<SocketAddr, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    #[derive(Debug, PartialEq, Eq, Hash, Deserialize)]
-    #[serde(untagged)]
-    enum Value {
-        SocketAddr(SocketAddr),
-        Port(u16),
-        Env { env: String },
-    }
-
-    match Value::deserialize(deserializer)? {
-        Value::SocketAddr(addr) => Ok(addr),
-        Value::Port(port) => Ok(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), port)),
-        Value::Env { env } => std::env::var(env)
-            .map_err(|error| format!("{:}", error))
-            .and_then(|value| match value.parse() {
-                Ok(addr) => Ok(addr),
-                Err(error) => match value.parse() {
-                    Ok(port) => Ok(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), port)),
-                    Err(_) => Err(format!("{:?}", error)),
-                },
-            })
-            .map_err(de::Error::custom),
-    }
-}
-
 fn deserialize_humansize<'de, D>(deserializer: D) -> Result<usize, D::Error>
 where
     D: de::Deserializer<'de>,
@@ -188,4 +163,53 @@ where
     let value = String::deserialize(deserializer)?;
     let size = Size::from_str(&value).map_err(de::Error::custom)?;
     Ok(size.to_bytes() as usize)
+}
+
+fn deserialize_maybe_env<'de, T, D>(deserializer: D) -> Result<T, D::Error>
+where
+    T: serde::de::DeserializeOwned + FromStr,
+    <T as FromStr>::Err: fmt::Debug,
+    D: Deserializer<'de>,
+{
+    #[derive(Debug, PartialEq, Eq, Deserialize)]
+    #[serde(untagged)]
+    enum MaybeEnv<V> {
+        Value(V),
+        Env { env: String },
+    }
+
+    match MaybeEnv::deserialize(deserializer)? {
+        MaybeEnv::Value(value) => Ok(value),
+        MaybeEnv::Env { env } => std::env::var(env)
+            .map_err(|error| format!("{error:?}"))
+            .and_then(|value| value.parse().map_err(|error| format!("{error:?}")))
+            .map_err(de::Error::custom),
+    }
+}
+
+fn deserialize_option_maybe_env<'de, T, D>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    T: serde::de::DeserializeOwned + FromStr,
+    <T as FromStr>::Err: fmt::Debug,
+    D: Deserializer<'de>,
+{
+    #[derive(Debug, PartialEq, Eq, Deserialize)]
+    #[serde(untagged)]
+    enum MaybeEnv<V> {
+        Value(Option<V>),
+        Env { env: String },
+    }
+
+    match MaybeEnv::deserialize(deserializer)? {
+        MaybeEnv::Value(value) => Ok(value),
+        MaybeEnv::Env { env } => match std::env::var(env) {
+            Ok(value) => value
+                .parse()
+                .map(Some)
+                .map_err(|error| format!("{error:?}")),
+            Err(std::env::VarError::NotPresent) => Ok(None),
+            Err(error) => Err(format!("{error:?}")),
+        }
+        .map_err(de::Error::custom),
+    }
 }
