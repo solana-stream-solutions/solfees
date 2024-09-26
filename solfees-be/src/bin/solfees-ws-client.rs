@@ -1,7 +1,7 @@
 use {
     anyhow::Context,
     clap::Parser,
-    futures::{future, pin_mut, StreamExt},
+    futures::{future::TryFutureExt, stream::StreamExt},
     tokio_tungstenite::{connect_async, tungstenite::protocol::Message},
     tracing::info,
 };
@@ -22,21 +22,29 @@ async fn main() -> anyhow::Result<()> {
     let (ws_stream, _) = connect_async(args.endpoint)
         .await
         .context("failed to connect to WS server")?;
-    let (ws_write, ws_read) = ws_stream.split();
+    let (ws_write, mut ws_read) = ws_stream.split();
 
     let (req_tx, req_rx) = futures::channel::mpsc::unbounded();
-    let text = r#"{"id": 0, "method": "SlotsSubscribe", "params": {"levels": [5000]}}"#.to_owned();
+    let text = r#"{"id":0,"method":"SlotsSubscribe","params":{"readWrite":[],"readOnly":["TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"],"levels":[5000,9500]}}"#.to_owned();
     req_tx.unbounded_send(Message::text(text))?;
 
-    let req_to_ws = req_rx.map(Ok).forward(ws_write);
-    let ws_to_stdout = {
-        ws_read.for_each(|message| async move {
-            info!("new message: {:?}", message);
-        })
+    let req_to_ws = req_rx.map(Ok).forward(ws_write).map_err(Into::into);
+    let ws_to_stdout = async move {
+        loop {
+            let text = match ws_read.next().await {
+                Some(Ok(Message::Text(message))) => message,
+                Some(Ok(Message::Binary(msg))) => String::from_utf8(msg)
+                    .map_err(|_error| anyhow::anyhow!("failed to convert to string"))?,
+                Some(Ok(Message::Ping(_))) => continue,
+                Some(Ok(Message::Pong(_))) => continue,
+                Some(Ok(Message::Frame(_))) => continue,
+                Some(Ok(Message::Close(_))) => return Ok(()),
+                Some(Err(error)) => anyhow::bail!(error),
+                None => anyhow::bail!("stream is closed"),
+            };
+            info!("new message: {text}");
+        }
     };
 
-    pin_mut!(req_to_ws, ws_to_stdout);
-    future::select(req_to_ws, ws_to_stdout).await;
-
-    Ok(())
+    tokio::try_join!(req_to_ws, ws_to_stdout).map(|_| ())
 }

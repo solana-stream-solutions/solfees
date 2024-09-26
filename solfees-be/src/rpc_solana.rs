@@ -157,7 +157,7 @@ impl SolanaRpc {
             };
 
             match call.method.as_str() {
-                "getLatestBlockhash" => {
+                "getLatestBlockhash" if mode != SolanaRpcMode::SolfeesFrontend => {
                     metrics::request_inc(mode, RpcRequestType::LatestBlockhash);
 
                     let parsed_params = match mode {
@@ -176,9 +176,7 @@ impl SolanaRpc {
                                 (commitment, 0, min_context_slot)
                             })
                         }
-                        SolanaRpcMode::Triton
-                        | SolanaRpcMode::Solfees
-                        | SolanaRpcMode::SolfeesFrontend => {
+                        SolanaRpcMode::Triton | SolanaRpcMode::Solfees => {
                             #[derive(Debug, Deserialize)]
                             struct ReqParams {
                                 #[serde(default)]
@@ -191,6 +189,7 @@ impl SolanaRpc {
                                 (context.commitment, rollback, context.min_context_slot)
                             })
                         }
+                        SolanaRpcMode::SolfeesFrontend => unreachable!(),
                     };
 
                     outputs.push(match parsed_params {
@@ -296,7 +295,7 @@ impl SolanaRpc {
                         })
                     }
                 }
-                "getSlot" => {
+                "getSlot" if mode != SolanaRpcMode::SolfeesFrontend => {
                     metrics::request_inc(mode, RpcRequestType::Slot);
 
                     #[derive(Debug, Deserialize)]
@@ -513,10 +512,6 @@ impl SolanaRpc {
                     Ok(update) => if let Some((id, filter)) = filter.as_ref() {
                         let output = match update.as_ref() {
                             StreamsUpdateMessage::Status { slot, commitment } => {
-                                if *commitment == CommitmentLevel::Processed {
-                                    continue;
-                                }
-
                                 SlotsSubscribeOutput::Status {
                                     slot: *slot,
                                     commitment: *commitment
@@ -615,7 +610,7 @@ impl SolanaRpc {
 
                             let info = StreamsSlotInfo::new(slot, hash, time, height, transactions);
                             slots_info.insert(slot, info.clone());
-                            while slots_info.len() >= MAX_NUM_RECENT_SLOT_INFO {
+                            while slots_info.len() > MAX_NUM_RECENT_SLOT_INFO {
                                 slots_info.pop_first();
                             }
 
@@ -1064,6 +1059,26 @@ impl TryFrom<ReqParamsSlotsSubscribeConfig> for SlotSubscribeFilter {
     type Error = JsonrpcError;
 
     fn try_from(config: ReqParamsSlotsSubscribeConfig) -> Result<Self, Self::Error> {
+        if config.read_write.len() + config.read_only.len() > MAX_TX_ACCOUNT_LOCKS {
+            return Err(JsonrpcError::invalid_params(format!(
+                "read_write and read_only should contain less than {MAX_TX_ACCOUNT_LOCKS} accounts"
+            )));
+        }
+
+        if config.levels.len() > 5 {
+            return Err(JsonrpcError::invalid_params(
+                "only max 5 percentile levels are allowed".to_owned(),
+            ));
+        }
+
+        for level in config.levels.iter().copied() {
+            if level > 10_000 {
+                return Err(JsonrpcError::invalid_params(
+                    "percentile level is too big; max value is 10000".to_owned(),
+                ));
+            }
+        }
+
         let read_write = config
             .read_write
             .iter()
@@ -1083,26 +1098,6 @@ impl TryFrom<ReqParamsSlotsSubscribeConfig> for SlotSubscribeFilter {
                 })
             })
             .collect::<Result<Vec<Pubkey>, _>>()?;
-
-        if read_write.len() + read_only.len() > MAX_TX_ACCOUNT_LOCKS {
-            return Err(JsonrpcError::invalid_params(format!(
-                "read_write and read_only should contain less than {MAX_TX_ACCOUNT_LOCKS} accounts"
-            )));
-        }
-
-        if config.levels.len() > 5 {
-            return Err(JsonrpcError::invalid_params(
-                "only max 5 percentile levels are allowed".to_owned(),
-            ));
-        }
-
-        for level in config.levels.iter().copied() {
-            if level > 10_000 {
-                return Err(JsonrpcError::invalid_params(
-                    "percentile level is too big; max value is 10000".to_owned(),
-                ));
-            }
-        }
 
         Ok(Self {
             read_write,
@@ -1124,10 +1119,12 @@ impl SlotSubscribeFilter {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 enum SlotsSubscribeOutput {
+    #[serde(rename_all = "camelCase")]
     Status {
         slot: Slot,
         commitment: CommitmentLevel,
     },
+    #[serde(rename_all = "camelCase")]
     Slot {
         identity: String,
         slot: Slot,
@@ -1148,13 +1145,19 @@ enum SlotsSubscribeOutput {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 enum SlotsSubscribeOutputSolana {
+    #[serde(rename_all = "camelCase")]
     Status {
         slot: Slot,
         commitment: CommitmentLevel,
     },
+    #[serde(rename_all = "camelCase")]
     Slot {
         slot: Slot,
         commitment: CommitmentLevel,
+        height: Slot,
+        total_transactions_filtered: usize,
+        total_transactions_vote: usize,
+        total_transactions: usize,
         fee_average: f64,
         fee_levels: Vec<Option<u64>>,
     },
@@ -1169,12 +1172,20 @@ impl From<SlotsSubscribeOutput> for SlotsSubscribeOutputSolana {
             SlotsSubscribeOutput::Slot {
                 slot,
                 commitment,
+                height,
+                total_transactions_filtered,
+                total_transactions_vote,
+                total_transactions,
                 fee_average,
                 fee_levels,
                 ..
             } => SlotsSubscribeOutputSolana::Slot {
                 slot,
                 commitment,
+                height,
+                total_transactions_filtered,
+                total_transactions_vote,
+                total_transactions,
                 fee_average,
                 fee_levels,
             },
@@ -1187,6 +1198,10 @@ impl From<SlotsSubscribeOutput> for SlotsSubscribeOutputSolana {
 struct SolfeesPrioritizationFee {
     slot: Slot,
     commitment: CommitmentLevel,
+    height: Slot,
+    total_transactions_filtered: usize,
+    total_transactions_vote: usize,
+    total_transactions: usize,
     fee_average: f64,
     fee_levels: Vec<Option<u64>>,
 }
@@ -1202,12 +1217,20 @@ impl TryFrom<SlotsSubscribeOutput> for SolfeesPrioritizationFee {
             SlotsSubscribeOutput::Slot {
                 slot,
                 commitment,
+                height,
+                total_transactions_filtered,
+                total_transactions_vote,
+                total_transactions,
                 fee_average,
                 fee_levels,
                 ..
             } => Ok(SolfeesPrioritizationFee {
                 slot,
                 commitment,
+                height,
+                total_transactions_filtered,
+                total_transactions_vote,
+                total_transactions,
                 fee_average,
                 fee_levels,
             }),
