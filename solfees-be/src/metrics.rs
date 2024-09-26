@@ -91,7 +91,7 @@ pub mod solfees_be {
             grpc_geyser::CommitmentLevel,
             rpc_solana::{RpcRequestType, SolanaRpcMode},
         },
-        prometheus::{IntGaugeVec, Opts},
+        prometheus::{IntCounterVec, IntGaugeVec, Opts},
         solana_sdk::clock::Slot,
     };
 
@@ -101,9 +101,19 @@ pub mod solfees_be {
             &["commitment"]
         ).unwrap();
 
-        static ref REQUEST_TOTAL: IntGaugeVec = IntGaugeVec::new(
-            Opts::new("requests_total", "Total number of requests by API, method and status"),
+        static ref REQUESTS_TOTAL: IntCounterVec = IntCounterVec::new(
+            Opts::new("requests_total", "Total number of requests by API"),
+            &["api"]
+        ).unwrap();
+
+        static ref REQUESTS_CALLS_TOTAL: IntCounterVec = IntCounterVec::new(
+            Opts::new("requests_calls_total", "Total number of request calls by API and method"),
             &["api", "method"]
+        ).unwrap();
+
+        static ref WEBSOCKETS_TOTAL: IntGaugeVec = IntGaugeVec::new(
+            Opts::new("websockets_total", "Total number of alive WebSocket connections"),
+            &["api"]
         ).unwrap();
     }
 
@@ -111,7 +121,9 @@ pub mod solfees_be {
         init2();
 
         register!(LATEST_SLOT);
-        register!(REQUEST_TOTAL);
+        register!(REQUESTS_TOTAL);
+        register!(REQUESTS_CALLS_TOTAL);
+        register!(WEBSOCKETS_TOTAL);
     }
 
     pub fn set_slot(commitment: CommitmentLevel, slot: Slot) {
@@ -120,8 +132,19 @@ pub mod solfees_be {
             .set(slot as i64);
     }
 
-    pub fn request_inc(api: SolanaRpcMode, method: RpcRequestType) {
-        REQUEST_TOTAL
+    pub fn requests_inc(api: SolanaRpcMode) {
+        REQUESTS_TOTAL
+            .with_label_values(&[match api {
+                SolanaRpcMode::Solana => "solana",
+                SolanaRpcMode::Triton => "triton",
+                SolanaRpcMode::Solfees => "solfees",
+                SolanaRpcMode::SolfeesFrontend => "frontend",
+            }])
+            .inc()
+    }
+
+    pub fn requests_call_inc(api: SolanaRpcMode, method: RpcRequestType) {
+        REQUESTS_CALLS_TOTAL
             .with_label_values(&[
                 match api {
                     SolanaRpcMode::Solana => "solana",
@@ -137,5 +160,23 @@ pub mod solfees_be {
                 },
             ])
             .inc()
+    }
+
+    pub fn websockets_inc(api: SolanaRpcMode) {
+        let api = match api {
+            SolanaRpcMode::Solfees => "solfees",
+            SolanaRpcMode::SolfeesFrontend => "frontend",
+            _ => return,
+        };
+        WEBSOCKETS_TOTAL.with_label_values(&[api]).inc()
+    }
+
+    pub fn websockets_dec(api: SolanaRpcMode) {
+        let api = match api {
+            SolanaRpcMode::Solfees => "solfees",
+            SolanaRpcMode::SolfeesFrontend => "frontend",
+            _ => return,
+        };
+        WEBSOCKETS_TOTAL.with_label_values(&[api]).dec()
     }
 }

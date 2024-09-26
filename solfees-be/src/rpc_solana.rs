@@ -158,7 +158,7 @@ impl SolanaRpc {
 
             match call.method.as_str() {
                 "getLatestBlockhash" if mode != SolanaRpcMode::SolfeesFrontend => {
-                    metrics::request_inc(mode, RpcRequestType::LatestBlockhash);
+                    metrics::requests_call_inc(mode, RpcRequestType::LatestBlockhash);
 
                     let parsed_params = match mode {
                         SolanaRpcMode::Solana => {
@@ -207,7 +207,7 @@ impl SolanaRpc {
                     });
                 }
                 "getRecentPrioritizationFees" => {
-                    metrics::request_inc(mode, RpcRequestType::RecentPrioritizationFees);
+                    metrics::requests_call_inc(mode, RpcRequestType::RecentPrioritizationFees);
 
                     let maybe_parsed_params = match mode {
                         SolanaRpcMode::Solana => {
@@ -296,7 +296,7 @@ impl SolanaRpc {
                     }
                 }
                 "getSlot" if mode != SolanaRpcMode::SolfeesFrontend => {
-                    metrics::request_inc(mode, RpcRequestType::Slot);
+                    metrics::requests_call_inc(mode, RpcRequestType::Slot);
 
                     #[derive(Debug, Deserialize)]
                     struct ReqParams {
@@ -326,7 +326,7 @@ impl SolanaRpc {
                     )
                 }
                 "getVersion" if mode != SolanaRpcMode::SolfeesFrontend => {
-                    metrics::request_inc(mode, RpcRequestType::Version);
+                    metrics::requests_call_inc(mode, RpcRequestType::Version);
 
                     outputs.push(Some(if let Err(error) = call.params.expect_no_params() {
                         Self::create_failure(call.jsonrpc, call.id, error)
@@ -435,10 +435,10 @@ impl SolanaRpc {
                 return;
             }
         };
+        metrics::websockets_inc(mode);
+
         let mut updates_rx = self.streams_tx.subscribe();
-
         let mut filter = None;
-
         let mut websocket_tx_message = None;
         let mut flush_required = false;
 
@@ -542,6 +542,8 @@ impl SolanaRpc {
                 .await;
         }
         let _ = websocket_tx.flush().await;
+
+        metrics::websockets_dec(mode);
     }
 
     fn create_success<R>(jsonrpc: Option<JsonrpcVersion>, id: JsonrpcId, result: R) -> JsonrpcOutput

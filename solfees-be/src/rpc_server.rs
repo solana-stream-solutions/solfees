@@ -1,6 +1,6 @@
 use {
     crate::{
-        metrics,
+        metrics::{self, solfees_be as metrics_be},
         rpc_solana::{SolanaRpc, SolanaRpcMode},
     },
     futures::future::TryFutureExt,
@@ -115,6 +115,7 @@ pub async fn run_solfees(
 
                     match req_type {
                         ReqType::Rpc => {
+                            metrics_be::requests_inc(solana_rpc_mode);
                             match Limited::new(req.into_body(), body_limit)
                                 .collect()
                                 .map_err(|error| anyhow::anyhow!(error))
