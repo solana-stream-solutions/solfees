@@ -11,7 +11,8 @@ listen_admin:
 
 listen_rpc:
   bind: 127.0.0.1:8000
-  body_limit: 50KiB
+  body_limit: 16KiB
+  request_calls_max: 10 # Maximum number of calls in on request
   request_timeout: 60s
   request_queue_max: 1000
   streams_channel_capacity: 150

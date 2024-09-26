@@ -85,11 +85,57 @@ pub mod grpc2redis {
 }
 
 pub mod solfees_be {
-    use super::init2;
+    use {
+        super::{init2, REGISTRY},
+        crate::{
+            grpc_geyser::CommitmentLevel,
+            rpc_solana::{RpcRequestType, SolanaRpcMode},
+        },
+        prometheus::{IntGaugeVec, Opts},
+        solana_sdk::clock::Slot,
+    };
+
+    lazy_static::lazy_static! {
+        static ref LATEST_SLOT: IntGaugeVec = IntGaugeVec::new(
+            Opts::new("latest_slot", "Latest slot received from Redis by commitment"),
+            &["commitment"]
+        ).unwrap();
+
+        static ref REQUEST_TOTAL: IntGaugeVec = IntGaugeVec::new(
+            Opts::new("requests_total", "Total number of requests by API, method and status"),
+            &["api", "method"]
+        ).unwrap();
+    }
 
     pub fn init() {
         init2();
+
+        register!(LATEST_SLOT);
+        register!(REQUEST_TOTAL);
     }
 
-    //
+    pub fn set_slot(commitment: CommitmentLevel, slot: Slot) {
+        LATEST_SLOT
+            .with_label_values(&[commitment.as_str()])
+            .set(slot as i64);
+    }
+
+    pub fn request_inc(api: SolanaRpcMode, method: RpcRequestType) {
+        REQUEST_TOTAL
+            .with_label_values(&[
+                match api {
+                    SolanaRpcMode::Solana => "solana",
+                    SolanaRpcMode::Triton => "triton",
+                    SolanaRpcMode::Solfees => "solfees",
+                    SolanaRpcMode::SolfeesFrontend => "frontend",
+                },
+                match method {
+                    RpcRequestType::LatestBlockhash => "get_latest_blockhash",
+                    RpcRequestType::RecentPrioritizationFees => "get_recent_prioritization_fees",
+                    RpcRequestType::Slot => "get_slot",
+                    RpcRequestType::Version => "get_version",
+                },
+            ])
+            .inc()
+    }
 }

@@ -22,6 +22,8 @@ pub async fn subscribe(
         let mut latest_id = "0".to_owned();
         'outer: loop {
             let mut stream_keys = match redis::cmd("XREAD")
+                .arg("COUNT")
+                .arg(5)
                 .arg("STREAMS")
                 .arg(&config.stream_key)
                 .arg(&latest_id)
@@ -36,7 +38,7 @@ pub async fn subscribe(
             };
 
             let Some(stream_key) = stream_keys.pop() else {
-                sleep(Duration::from_millis(1)).await;
+                sleep(Duration::from_micros(500)).await;
                 continue;
             };
 

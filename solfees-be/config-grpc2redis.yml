@@ -8,9 +8,9 @@ grpc:
 redis:
   endpoint: redis://127.0.0.1:6379/
   stream_key: solfees:events
-  # 15_000 / 4 / 2.5 / 60 = 25min (4 events per slot, 2.5 slots per sec)
   # increate for production
-  stream_maxlen: 150
+  # 3_000 / 4 / 2.5 / 60 = 5min (4 events per slot, 2.5 slots per sec)
+  stream_maxlen: 600
   stream_field_key: message
 
 listen_admin:

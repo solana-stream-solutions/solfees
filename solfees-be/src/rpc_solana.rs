@@ -1,5 +1,8 @@
 use {
-    crate::grpc_geyser::{CommitmentLevel, GeyserMessage, GeyserTransaction},
+    crate::{
+        grpc_geyser::{CommitmentLevel, GeyserMessage, GeyserTransaction},
+        metrics::solfees_be as metrics,
+    },
     futures::{
         future::{pending, FutureExt},
         sink::SinkExt,
@@ -155,6 +158,8 @@ impl SolanaRpc {
 
             match call.method.as_str() {
                 "getLatestBlockhash" => {
+                    metrics::request_inc(mode, RpcRequestType::LatestBlockhash);
+
                     let parsed_params = match mode {
                         SolanaRpcMode::Solana => {
                             #[derive(Debug, Deserialize)]
@@ -203,6 +208,8 @@ impl SolanaRpc {
                     });
                 }
                 "getRecentPrioritizationFees" => {
+                    metrics::request_inc(mode, RpcRequestType::RecentPrioritizationFees);
+
                     let maybe_parsed_params = match mode {
                         SolanaRpcMode::Solana => {
                             #[derive(Debug, Deserialize)]
@@ -290,6 +297,8 @@ impl SolanaRpc {
                     }
                 }
                 "getSlot" => {
+                    metrics::request_inc(mode, RpcRequestType::Slot);
+
                     #[derive(Debug, Deserialize)]
                     struct ReqParams {
                         #[serde(default)]
@@ -318,6 +327,8 @@ impl SolanaRpc {
                     )
                 }
                 "getVersion" if mode != SolanaRpcMode::SolfeesFrontend => {
+                    metrics::request_inc(mode, RpcRequestType::Version);
+
                     outputs.push(Some(if let Err(error) = call.params.expect_no_params() {
                         Self::create_failure(call.jsonrpc, call.id, error)
                     } else {
@@ -557,6 +568,15 @@ impl SolanaRpc {
         JsonrpcOutput::Failure(JsonrpcFailure { jsonrpc, error, id })
     }
 
+    fn internal_error_with_data<R>(data: R) -> JsonrpcError
+    where
+        R: Serialize,
+    {
+        let mut error = JsonrpcError::internal_error();
+        error.data = Some(serde_json::to_value(data).expect("failed to serialize"));
+        error
+    }
+
     async fn run_update_loop(
         mut geyser_rx: mpsc::UnboundedReceiver<Option<GeyserMessage>>,
         streams_tx: broadcast::Sender<Arc<StreamsUpdateMessage>>,
@@ -579,6 +599,8 @@ impl SolanaRpc {
                             }
 
                             let _ = streams_tx.send(Arc::new(StreamsUpdateMessage::Status { slot, commitment }));
+
+                            metrics::set_slot(commitment, slot);
                         }
                         GeyserMessage::Slot {
                             slot,
@@ -633,19 +655,25 @@ impl SolanaRpc {
                                         }
 
                                         let Some(mut value) = latest_blockhash_storage.slots.get(&slot) else {
-                                            return Self::create_failure(jsonrpc, id, JsonrpcError::internal_error());
+                                            return Self::create_failure(jsonrpc, id, SolanaRpc::internal_error_with_data("no slot"));
                                         };
-                                        for _ in 0..rollback {
-                                            loop {
-                                                slot -= 1;
-                                                match latest_blockhash_storage.slots.get(&slot) {
-                                                    Some(prev_value) => {
-                                                        if prev_value.commitment == commitment {
+                                        if rollback > 0 {
+                                            let Some(first_available_slot) = latest_blockhash_storage.slots.keys().next().copied() else {
+                                                return Self::create_failure(jsonrpc, id, JsonrpcError::invalid_params("empty slots storage"));
+                                            };
+
+                                            for _ in 0..rollback {
+                                                loop {
+                                                    slot -= 1;
+
+                                                    if let Some(prev_value) = latest_blockhash_storage.slots.get(&slot) {
+                                                        if prev_value.height + 1 == value.height {
                                                             value = prev_value;
                                                             break;
                                                         }
+                                                    } else if slot < first_available_slot {
+                                                        return Self::create_failure(jsonrpc, id, JsonrpcError::invalid_params("not enought slots in the storage"));
                                                     }
-                                                    _ => return Self::create_failure(jsonrpc, id, JsonrpcError::invalid_params("failed to rollback block")),
                                                 }
                                             }
                                         }
@@ -754,6 +782,14 @@ struct RpcRequests {
     requests: Vec<RpcRequest>,
     shutdown: Arc<AtomicBool>,
     response_tx: oneshot::Sender<Vec<JsonrpcOutput>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RpcRequestType {
+    LatestBlockhash,
+    RecentPrioritizationFees,
+    Slot,
+    Version,
 }
 
 #[derive(Debug)]
@@ -1160,7 +1196,9 @@ impl TryFrom<SlotsSubscribeOutput> for SolfeesPrioritizationFee {
 
     fn try_from(output: SlotsSubscribeOutput) -> Result<Self, Self::Error> {
         match output {
-            SlotsSubscribeOutput::Status { .. } => Err(JsonrpcError::internal_error()),
+            SlotsSubscribeOutput::Status { .. } => {
+                Err(SolanaRpc::internal_error_with_data("unexpected type"))
+            }
             SlotsSubscribeOutput::Slot {
                 slot,
                 commitment,
