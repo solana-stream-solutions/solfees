@@ -5,5 +5,6 @@ pub mod metrics;
 pub mod redis;
 pub mod rpc_server;
 pub mod rpc_solana;
+pub mod schedule;
 pub mod tracing;
 pub mod version;

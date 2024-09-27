@@ -1,4 +1,5 @@
 use {
+    crate::schedule::SolanaSchedule,
     anyhow::Context,
     borsh::de::BorshDeserialize,
     futures::stream::StreamExt,
@@ -254,6 +255,7 @@ pub enum GeyserMessage {
         commitment: CommitmentLevel,
     },
     Slot {
+        leader: Option<Pubkey>,
         slot: Slot,
         hash: Hash,
         time: UnixTimestamp,
@@ -266,10 +268,12 @@ pub enum GeyserMessage {
 
 impl GeyserMessage {
     fn build_block(
+        leader: Option<Pubkey>,
         info: SubscribeUpdateBlockMeta,
         transactions: Vec<GeyserTransaction>,
     ) -> anyhow::Result<GeyserMessage> {
         Ok(GeyserMessage::Slot {
+            leader,
             slot: info.slot,
             hash: info
                 .blockhash
@@ -294,14 +298,15 @@ impl GeyserMessage {
 }
 
 pub async fn subscribe<T>(
-    endpoint: String,
-    x_token: Option<T>,
+    grpc_endpoint: String,
+    grpc_x_token: Option<T>,
+    rpc_endpoint: String,
 ) -> anyhow::Result<mpsc::UnboundedReceiver<anyhow::Result<GeyserMessage>>>
 where
     T: TryInto<AsciiMetadataValue, Error = InvalidMetadataValue>,
 {
-    let mut stream = GeyserGrpcClient::build_from_shared(endpoint)?
-        .x_token(x_token)?
+    let mut stream = GeyserGrpcClient::build_from_shared(grpc_endpoint)?
+        .x_token(grpc_x_token)?
         .tls_config(ClientTlsConfig::new().with_native_roots())?
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
@@ -332,6 +337,7 @@ where
 
     let (tx, rx) = mpsc::unbounded_channel();
     tokio::spawn(async move {
+        let schedule = SolanaSchedule::new(rpc_endpoint);
         let mut transactions: BTreeMap<Slot, Vec<GeyserTransaction>> = Default::default();
 
         let mut alive = true;
@@ -381,7 +387,8 @@ where
                 }
                 Some(Ok(Some(UpdateOneof::BlockMeta(info)))) => {
                     if let Some(transactions) = transactions.remove(&info.slot) {
-                        GeyserMessage::build_block(info, transactions)
+                        let leader = schedule.get_leader(info.slot);
+                        GeyserMessage::build_block(leader, info, transactions)
                     } else {
                         continue;
                     }

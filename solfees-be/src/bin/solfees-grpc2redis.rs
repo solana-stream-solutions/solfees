@@ -39,9 +39,13 @@ async fn main2(config: Config) -> anyhow::Result<()> {
         .await
         .context("failed to get Redis connection")?;
 
-    let mut geyser_rx = grpc_geyser::subscribe(config.grpc.endpoint, config.grpc.x_token)
-        .await
-        .context("failed to open gRPC subscription")?;
+    let mut geyser_rx = grpc_geyser::subscribe(
+        config.grpc.endpoint,
+        config.grpc.x_token,
+        config.rpc.endpoint,
+    )
+    .await
+    .context("failed to open gRPC subscription")?;
 
     let mut shutdown_rx = cli::shutdown_signal();
     let sigint = SignalKind::interrupt();

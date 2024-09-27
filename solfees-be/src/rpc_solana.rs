@@ -600,6 +600,7 @@ impl SolanaRpc {
                             metrics::set_slot(commitment, slot);
                         }
                         GeyserMessage::Slot {
+                            leader,
                             slot,
                             hash,
                             time,
@@ -610,7 +611,7 @@ impl SolanaRpc {
                         } => {
                             latest_blockhash_storage.push_block(slot, height, hash);
 
-                            let info = StreamsSlotInfo::new(slot, hash, time, height, transactions);
+                            let info = StreamsSlotInfo::new(leader, slot, hash, time, height, transactions);
                             slots_info.insert(slot, info.clone());
                             while slots_info.len() > MAX_NUM_RECENT_SLOT_INFO {
                                 slots_info.pop_first();
@@ -872,7 +873,7 @@ struct LatestBlockhashSlot {
 
 #[derive(Debug, Clone)]
 struct StreamsSlotInfo {
-    identity: Pubkey,
+    leader: Option<Pubkey>,
     slot: Slot,
     commitment: CommitmentLevel,
     hash: Hash,
@@ -887,6 +888,7 @@ struct StreamsSlotInfo {
 
 impl StreamsSlotInfo {
     fn new(
+        leader: Option<Pubkey>,
         slot: Slot,
         hash: Hash,
         time: UnixTimestamp,
@@ -905,7 +907,7 @@ impl StreamsSlotInfo {
             .sum::<u64>();
 
         Self {
-            identity: Pubkey::default(), // TODO
+            leader,
             slot,
             commitment: CommitmentLevel::Processed,
             hash,
@@ -947,7 +949,7 @@ impl StreamsSlotInfo {
         };
 
         SlotsSubscribeOutput::Slot {
-            identity: self.identity.to_string(),
+            leader: self.leader.map(|pk| pk.to_string()).unwrap_or_default(),
             slot: self.slot,
             commitment: self.commitment,
             hash: self.hash.to_string(),
@@ -1128,7 +1130,7 @@ enum SlotsSubscribeOutput {
     },
     #[serde(rename_all = "camelCase")]
     Slot {
-        identity: String,
+        leader: String,
         slot: Slot,
         commitment: CommitmentLevel,
         hash: String,

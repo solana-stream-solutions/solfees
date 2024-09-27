@@ -20,6 +20,7 @@ pub trait WithConfigTracing {
 #[serde(deny_unknown_fields, default)]
 pub struct ConfigGrpc2Redis {
     pub tracing: ConfigTracing,
+    pub rpc: ConfigRpc,
     pub grpc: ConfigGrpc,
     pub redis: ConfigRedisPublisher,
     pub listen_admin: ConfigListenAdmin,
@@ -40,6 +41,21 @@ pub struct ConfigTracing {
 impl Default for ConfigTracing {
     fn default() -> Self {
         Self { json: true }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct ConfigRpc {
+    #[serde(deserialize_with = "deserialize_maybe_env")]
+    pub endpoint: String,
+}
+
+impl Default for ConfigRpc {
+    fn default() -> Self {
+        Self {
+            endpoint: "http://127.0.0.1:8899".to_owned(),
+        }
     }
 }
 

@@ -3,13 +3,17 @@ use {clap::Parser, solfees_be::grpc_geyser::GeyserMessage, tracing::error};
 #[derive(Debug, Clone, Parser)]
 #[clap(author, version, about)]
 struct Args {
-    /// Service endpoint
-    #[clap(short, long, default_value_t = String::from("http://127.0.0.1:10000"))]
-    endpoint: String,
+    /// RPC endpoint
+    #[clap(short, long, default_value_t = String::from("http://127.0.0.1:8899"))]
+    rpc_endpoint: String,
 
-    /// Access token
+    /// gRPC service endpoint
+    #[clap(short, long, default_value_t = String::from("http://127.0.0.1:10000"))]
+    grpc_endpoint: String,
+
+    /// gRPC access token
     #[clap(long)]
-    x_token: Option<String>,
+    grpc_x_token: Option<String>,
 }
 
 #[tokio::main]
@@ -18,7 +22,12 @@ async fn main() -> anyhow::Result<()> {
 
     let args = Args::parse();
 
-    let mut rx = solfees_be::grpc_geyser::subscribe(args.endpoint, args.x_token).await?;
+    let mut rx = solfees_be::grpc_geyser::subscribe(
+        args.grpc_endpoint,
+        args.grpc_x_token,
+        args.rpc_endpoint,
+    )
+    .await?;
     while let Some(message) = rx.recv().await {
         match message? {
             GeyserMessage::Status {
@@ -28,6 +37,7 @@ async fn main() -> anyhow::Result<()> {
                 //
             }
             GeyserMessage::Slot {
+                leader,
                 slot,
                 hash: _,
                 time: _,
@@ -46,6 +56,7 @@ async fn main() -> anyhow::Result<()> {
 
                     if expected_fee != tx.fee {
                         error!(
+                            ?leader,
                             fee = tx.fee,
                             expected_fee,
                             sigs_count = tx.sigs_count,
