@@ -9,7 +9,7 @@ use {
 #[derive(Debug, Clone, Parser)]
 #[clap(author, version, about)]
 struct Args {
-    #[clap(short, long, default_value_t = String::from("ws://127.0.0.1:8000/api/solfees/ws"))]
+    #[clap(short, long, default_value_t = String::from("wss://api.solfees.io/api/solfees/ws"))]
     endpoint: String,
 }
 
@@ -25,7 +25,7 @@ async fn main() -> anyhow::Result<()> {
     let (ws_write, mut ws_read) = ws_stream.split();
 
     let (req_tx, req_rx) = futures::channel::mpsc::unbounded();
-    let text = r#"{"id":0,"method":"SlotsSubscribe","params":{"readWrite":[],"readOnly":["TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"],"levels":[5000,9500]}}"#.to_owned();
+    let text = r#"{"id":0,"method":"SlotsSubscribe","params":{"readWrite":[],"readOnly":["TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"],"levels":[5000,9000]}}"#.to_owned();
     req_tx.unbounded_send(Message::text(text))?;
 
     let req_to_ws = req_rx.map(Ok).forward(ws_write).map_err(Into::into);

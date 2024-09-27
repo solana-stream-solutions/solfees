@@ -493,8 +493,8 @@ impl SolanaRpc {
 
                     match call.method.as_str() {
                         "SlotsSubscribe" => {
-                            let output = match call.params.parse().and_then(|ReqParamsSlotsSubscribe { config }| {
-                                SlotSubscribeFilter::try_from(config.unwrap_or_default())
+                            let output = match call.params.parse().and_then(|config: ReqParamsSlotsSubscribeConfig| {
+                                SlotSubscribeFilter::try_from(config)
                             }) {
                                 Ok(filter_new) => {
                                     filter = Some((call.id.clone(), filter_new));
@@ -926,7 +926,7 @@ impl StreamsSlotInfo {
                 && SlotSubscribeFilter::filter_pubkeys(&filter.read_write, &tx.accounts.writable)
                 && SlotSubscribeFilter::filter_pubkeys(&filter.read_only, &tx.accounts.readable)
         }) {
-            fees.push(transaction.fee);
+            fees.push(transaction.unit_price);
         }
         let total_transactions_filtered = fees.len();
 
