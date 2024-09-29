@@ -38,7 +38,9 @@ impl SolanaSchedule {
         match locked.get(&epoch) {
             Some(Some(leader_schedule)) => leader_schedule
                 .get_leader(index)
-                .inspect_err(|error| error!(%error, slot, "failed to get leader from existed schedule"))
+                .inspect_err(
+                    |error| error!(%error, slot, "failed to get leader from existed schedule"),
+                )
                 .ok(),
             Some(None) => None, // in progress
             None => {
