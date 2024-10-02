@@ -8,7 +8,8 @@ members = [
 authors = ["Solana Stream Solutions"]
 edition = "2021"
 homepage = "https://github.com/solana-stream-solutions"
-repository = "https://github.com/solana-stream-solutions/solfees-private"
+repository = "https://github.com/solana-stream-solutions/solfees"
+license = "MIT"
 keywords = ["solana"]
 publish = false
 

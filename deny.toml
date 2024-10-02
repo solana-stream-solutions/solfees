@@ -2,7 +2,8 @@
 all-features = true
 
 [advisories]
-ignore = [    # atty 0.2.14
+ignore = [
+    # atty 0.2.14
     # Advisory: https://rustsec.org/advisories/RUSTSEC-2021-0145
     "RUSTSEC-2021-0145",
 

@@ -6,6 +6,7 @@ edition = { workspace = true }
 description = "Backend of solfees.io"
 homepage = { workspace = true }
 repository = { workspace = true }
+license = { workspace = true }
 keywords = { workspace = true }
 publish = { workspace = true }
 
