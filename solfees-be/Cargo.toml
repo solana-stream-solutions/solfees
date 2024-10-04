@@ -12,7 +12,6 @@ publish = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-atty = { workspace = true }
 bincode = { workspace = true }
 borsh = { workspace = true }
 clap = { workspace = true, features = ["derive"] }

@@ -1,4 +1,5 @@
 use {
+    std::io::{self, IsTerminal},
     tracing::Subscriber,
     tracing_subscriber::{
         filter::{EnvFilter, LevelFilter},
@@ -27,7 +28,7 @@ where
     S: Subscriber,
     for<'a> S: LookupSpan<'a>,
 {
-    let is_atty = atty::is(atty::Stream::Stdout) && atty::is(atty::Stream::Stderr);
+    let is_atty = io::stdout().is_terminal() && io::stderr().is_terminal();
     let io_layer = layer().with_ansi(is_atty);
 
     if json {
