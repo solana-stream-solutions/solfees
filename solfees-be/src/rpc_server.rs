@@ -7,7 +7,7 @@ use {
     http_body_util::{BodyExt, Empty as BodyEmpty, Full as BodyFull, Limited},
     hyper::{
         body::{Bytes, Incoming as BodyIncoming},
-        header::CONTENT_TYPE,
+        header::{ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN, CONTENT_TYPE},
         service::service_fn,
         Request, Response, StatusCode,
     },
@@ -130,6 +130,8 @@ pub async fn run_solfees(
                             {
                                 Ok(body) => Response::builder()
                                     .header(CONTENT_TYPE, "application/json; charset=utf-8")
+                                    .header(ACCESS_CONTROL_ALLOW_METHODS, "OPTIONS, POST")
+                                    .header(ACCESS_CONTROL_ALLOW_ORIGIN, "*")
                                     .body(BodyFull::new(Bytes::from(body)).boxed()),
                                 Err(error) => Response::builder()
                                     .status(StatusCode::INTERNAL_SERVER_ERROR)
