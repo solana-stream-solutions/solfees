@@ -26,7 +26,7 @@ impl SolanaSchedule {
     pub fn new(endpoint: String) -> Self {
         Self {
             rpc: Arc::new(RpcClient::new(endpoint)),
-            epoch_schedule: EpochSchedule::new(432_000),
+            epoch_schedule: EpochSchedule::custom(432_000, 432_000, false),
             leader_schedule_by_epoch: Arc::new(Mutex::default()),
         }
     }
