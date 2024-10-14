@@ -12054,7 +12054,7 @@ const App = ({ router: router2 }) => {
   return /* @__PURE__ */ jsxRuntimeExports.jsx(Theme, { preset: presetGpnDefault, children: /* @__PURE__ */ jsxRuntimeExports.jsx(QueryClientProvider, { client: queryClient, children: /* @__PURE__ */ jsxRuntimeExports.jsx(RouterProvider, { router: router2 }) }) });
 };
 const Route$3 = createRootRoute();
-const __vite_import_meta_env__$1 = { "BASE_URL": "/solfees-fe-ci-test/", "DEV": false, "MODE": "production", "PROD": true, "SSR": false, "VITE_APP_ENVIRONMENT": "development" };
+const __vite_import_meta_env__$1 = { "BASE_URL": "/", "DEV": false, "MODE": "production", "PROD": true, "SSR": false, "VITE_APP_ENVIRONMENT": "development" };
 const createStoreImpl = (createState) => {
   let state;
   const listeners = /* @__PURE__ */ new Set();
@@ -12085,7 +12085,7 @@ const createStoreImpl = (createState) => {
   return api;
 };
 const createStore = (createState) => createState ? createStoreImpl(createState) : createStoreImpl;
-const __vite_import_meta_env__ = { "BASE_URL": "/solfees-fe-ci-test/", "DEV": false, "MODE": "production", "PROD": true, "SSR": false, "VITE_APP_ENVIRONMENT": "development" };
+const __vite_import_meta_env__ = { "BASE_URL": "/", "DEV": false, "MODE": "production", "PROD": true, "SSR": false, "VITE_APP_ENVIRONMENT": "development" };
 const { useDebugValue } = React;
 const { useSyncExternalStoreWithSelector } = useSyncExternalStoreExports;
 let didWarnAboutEqualityFn = false;
@@ -43532,4 +43532,4 @@ if (!rootElement.innerHTML) {
     /* @__PURE__ */ jsxRuntimeExports.jsx(React.Suspense, { fallback: "loading", children: /* @__PURE__ */ jsxRuntimeExports.jsx(App, { router }) })
   );
 }
-//# sourceMappingURL=index-DPj4ciw9.js.map
+//# sourceMappingURL=index-a14Ql1DC.js.map
