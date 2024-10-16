@@ -11,6 +11,7 @@ use {
         collections::HashMap,
         sync::{Arc, Mutex},
     },
+    tokio::sync::mpsc,
     tracing::{error, info},
 };
 
@@ -20,15 +21,19 @@ pub struct SolanaSchedule {
     rpc: Arc<RpcClient>,
     epoch_schedule: EpochSchedule,
     leader_schedule_by_epoch: Arc<Mutex<LeaderScheduleByEpoch>>,
+    leader_schedule_tx: mpsc::UnboundedSender<(Epoch, LeaderScheduleRpc)>,
 }
 
 impl SolanaSchedule {
-    pub fn new(endpoint: String) -> Self {
-        Self {
+    pub fn new(endpoint: String) -> (Self, mpsc::UnboundedReceiver<(Epoch, LeaderScheduleRpc)>) {
+        let (leader_schedule_tx, leader_schedule_rx) = mpsc::unbounded_channel();
+        let schedule = Self {
             rpc: Arc::new(RpcClient::new(endpoint)),
             epoch_schedule: EpochSchedule::custom(432_000, 432_000, false),
             leader_schedule_by_epoch: Arc::new(Mutex::default()),
-        }
+            leader_schedule_tx,
+        };
+        (schedule, leader_schedule_rx)
     }
 
     pub fn get_leader(&self, slot: Slot) -> Option<Pubkey> {
@@ -48,11 +53,17 @@ impl SolanaSchedule {
 
                 let rpc = Arc::clone(&self.rpc);
                 let leader_schedule_by_epoch = Arc::clone(&self.leader_schedule_by_epoch);
+                let leader_schedule_tx = self.leader_schedule_tx.clone();
                 tokio::spawn(async move {
                     info!(epoch, "trying to fetch schedule");
-                    if let Err(error) =
-                        Self::update_leader_schedule(epoch, slot, rpc, &leader_schedule_by_epoch)
-                            .await
+                    if let Err(error) = Self::update_leader_schedule(
+                        epoch,
+                        slot,
+                        rpc,
+                        &leader_schedule_by_epoch,
+                        leader_schedule_tx,
+                    )
+                    .await
                     {
                         error!(%error, slot, epoch, "failed to fetch leader schedule");
                         leader_schedule_by_epoch.lock().unwrap().remove(&epoch);
@@ -69,30 +80,34 @@ impl SolanaSchedule {
         slot: Slot,
         rpc: Arc<RpcClient>,
         leader_schedule_by_epoch: &Mutex<LeaderScheduleByEpoch>,
+        leader_schedule_tx: mpsc::UnboundedSender<(Epoch, LeaderScheduleRpc)>,
     ) -> anyhow::Result<()> {
-        let response = rpc
+        let leader_schedule_rpc = rpc
             .get_leader_schedule_with_commitment(Some(slot), CommitmentConfig::confirmed())
             .await
             .context("failed to fetch schedule from RPC")?
             .context("no schedule in RPC response")?;
-        let leader_schedule = LeadersSchedule::new(response)?;
+        let leader_schedule = LeadersSchedule::new(leader_schedule_rpc.clone())?;
         leader_schedule_by_epoch
             .lock()
             .unwrap()
             .insert(epoch, Some(leader_schedule));
-        info!(epoch, "save schedule for epoch");
+        info!(epoch, "epoch schedule saved");
+        let _ = leader_schedule_tx.send((epoch, leader_schedule_rpc));
         Ok(())
     }
 }
 
+pub type LeaderScheduleRpc = HashMap<String, Vec<usize>>;
+
 #[derive(Debug)]
-struct LeadersSchedule {
+pub struct LeadersSchedule {
     leaders: Vec<Pubkey>,
     indices: Box<[u16; 432_000]>,
 }
 
 impl LeadersSchedule {
-    fn new(schedule: HashMap<String, Vec<usize>>) -> anyhow::Result<Self> {
+    fn new(schedule: LeaderScheduleRpc) -> anyhow::Result<Self> {
         let mut map = HashMap::<Pubkey, u16>::new();
 
         let mut leaders = Vec::with_capacity(4096);

@@ -1,5 +1,5 @@
 use {
-    crate::schedule::SolanaSchedule,
+    crate::schedule::{LeaderScheduleRpc, SolanaSchedule},
     anyhow::Context,
     borsh::de::BorshDeserialize,
     futures::stream::StreamExt,
@@ -9,7 +9,7 @@ use {
         DEFAULT_INSTRUCTION_COMPUTE_UNIT_LIMIT, MAX_COMPUTE_UNIT_LIMIT,
     },
     solana_sdk::{
-        clock::{Slot, UnixTimestamp},
+        clock::{Epoch, Slot, UnixTimestamp},
         commitment_config::{
             CommitmentConfig as SolanaCommitmentConfig, CommitmentLevel as SolanaCommitmentLevel,
         },
@@ -301,7 +301,10 @@ pub async fn subscribe<T>(
     grpc_endpoint: String,
     grpc_x_token: Option<T>,
     rpc_endpoint: String,
-) -> anyhow::Result<mpsc::UnboundedReceiver<anyhow::Result<GeyserMessage>>>
+) -> anyhow::Result<(
+    mpsc::UnboundedReceiver<anyhow::Result<GeyserMessage>>,
+    mpsc::UnboundedReceiver<(Epoch, LeaderScheduleRpc)>,
+)>
 where
     T: TryInto<AsciiMetadataValue, Error = InvalidMetadataValue>,
 {
@@ -336,8 +339,8 @@ where
         .context("failed to subscribe on geyser stream")?;
 
     let (tx, rx) = mpsc::unbounded_channel();
+    let (schedule, schedule_rx) = SolanaSchedule::new(rpc_endpoint);
     tokio::spawn(async move {
-        let schedule = SolanaSchedule::new(rpc_endpoint);
         let mut transactions: BTreeMap<Slot, Vec<GeyserTransaction>> = Default::default();
 
         let mut alive = true;
@@ -399,6 +402,7 @@ where
                 Some(Err(error)) => Err(error.into()),
                 None => Err(anyhow::anyhow!("stream finished")),
             };
+
             alive = msg.is_ok();
             if tx.send(msg).is_err() {
                 break;
@@ -406,5 +410,5 @@ where
         }
     });
 
-    Ok(rx)
+    Ok((rx, schedule_rx))
 }
