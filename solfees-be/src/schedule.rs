@@ -87,7 +87,7 @@ impl SolanaSchedule {
             .await
             .context("failed to fetch schedule from RPC")?
             .context("no schedule in RPC response")?;
-        let leader_schedule = LeadersSchedule::new(leader_schedule_rpc.clone())?;
+        let leader_schedule = LeadersSchedule::new(&leader_schedule_rpc)?;
         leader_schedule_by_epoch
             .lock()
             .unwrap()
@@ -107,13 +107,13 @@ pub struct LeadersSchedule {
 }
 
 impl LeadersSchedule {
-    fn new(schedule: LeaderScheduleRpc) -> anyhow::Result<Self> {
+    pub fn new(schedule: &LeaderScheduleRpc) -> anyhow::Result<Self> {
         let mut map = HashMap::<Pubkey, u16>::new();
 
         let mut leaders = Vec::with_capacity(4096);
         let mut indices = Box::new([0; 432_000]);
 
-        for (leader, leader_schedule) in schedule.into_iter() {
+        for (leader, leader_schedule) in schedule.iter() {
             let leader = leader.parse().context("failed to parse leader key")?;
             let leader_index = match map.get(&leader) {
                 Some(index) => *index,
@@ -128,14 +128,14 @@ impl LeadersSchedule {
                 }
             };
             for index in leader_schedule {
-                indices[index] = leader_index;
+                indices[*index] = leader_index;
             }
         }
 
         Ok(Self { indices, leaders })
     }
 
-    fn get_leader(&self, index: u64) -> anyhow::Result<Pubkey> {
+    pub fn get_leader(&self, index: u64) -> anyhow::Result<Pubkey> {
         let leader_index = *self
             .indices
             .get(usize::try_from(index).context("failed convert to index")?)

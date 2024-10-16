@@ -135,6 +135,7 @@ pub struct ConfigRedisConsumer {
     pub endpoint: String,
     pub stream_key: String,
     pub stream_field_key: String,
+    pub epochs_key: String,
 }
 
 impl Default for ConfigRedisConsumer {
@@ -143,6 +144,7 @@ impl Default for ConfigRedisConsumer {
             endpoint: "redis://127.0.0.1:6379/".to_owned(),
             stream_key: "solfees:events".to_owned(),
             stream_field_key: "message".to_owned(),
+            epochs_key: "solfees:epochs".to_owned(),
         }
     }
 }

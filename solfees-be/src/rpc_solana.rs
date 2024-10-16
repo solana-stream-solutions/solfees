@@ -2,6 +2,7 @@ use {
     crate::{
         grpc_geyser::{CommitmentLevel, GeyserMessage, GeyserTransaction},
         metrics::solfees_be as metrics,
+        redis::RedisMessage,
     },
     futures::{
         future::{pending, FutureExt},
@@ -48,7 +49,7 @@ use {
         frame::{coding::CloseCode as WebSocketCloseCode, CloseFrame as WebSocketCloseFrame},
         Message as WebSocketMessage,
     },
-    tracing::debug,
+    tracing::{debug, info},
 };
 
 const MAX_NUM_RECENT_SLOT_INFO: usize = 150;
@@ -65,7 +66,7 @@ pub enum SolanaRpcMode {
 pub struct SolanaRpc {
     request_calls_max: usize,
     request_timeout: Duration,
-    geyser_tx: mpsc::UnboundedSender<Option<GeyserMessage>>,
+    redis_tx: mpsc::UnboundedSender<Option<RedisMessage>>,
     requests_tx: mpsc::Sender<RpcRequests>,
     streams_tx: broadcast::Sender<Arc<StreamsUpdateMessage>>,
 }
@@ -77,7 +78,7 @@ impl SolanaRpc {
         request_queue_max: usize,
         streams_channel_capacity: usize,
     ) -> (Self, impl Future<Output = anyhow::Result<()>>) {
-        let (geyser_tx, geyser_rx) = mpsc::unbounded_channel();
+        let (redis_tx, redis_rx) = mpsc::unbounded_channel();
         let (streams_tx, _streams_rx) = broadcast::channel(streams_channel_capacity);
         let (requests_tx, requests_rx) = mpsc::channel(request_queue_max);
 
@@ -85,25 +86,25 @@ impl SolanaRpc {
             Self {
                 request_calls_max,
                 request_timeout,
-                geyser_tx,
+                redis_tx,
                 requests_tx,
                 streams_tx: streams_tx.clone(),
             },
-            Self::run_update_loop(geyser_rx, streams_tx, requests_rx),
+            Self::run_update_loop(redis_rx, streams_tx, requests_rx),
         )
     }
 
     pub fn shutdown(&self) -> anyhow::Result<()> {
         anyhow::ensure!(
-            self.geyser_tx.send(None).is_ok(),
+            self.redis_tx.send(None).is_ok(),
             "SolanaRpc update loop is dead"
         );
         Ok(())
     }
 
-    pub fn push_geyser_message(&self, message: GeyserMessage) -> anyhow::Result<()> {
+    pub fn push_redis_message(&self, message: RedisMessage) -> anyhow::Result<()> {
         anyhow::ensure!(
-            self.geyser_tx.send(Some(message)).is_ok(),
+            self.redis_tx.send(Some(message)).is_ok(),
             "SolanaRpc update loop is dead"
         );
         Ok(())
@@ -575,19 +576,21 @@ impl SolanaRpc {
     }
 
     async fn run_update_loop(
-        mut geyser_rx: mpsc::UnboundedReceiver<Option<GeyserMessage>>,
+        mut redis_rx: mpsc::UnboundedReceiver<Option<RedisMessage>>,
         streams_tx: broadcast::Sender<Arc<StreamsUpdateMessage>>,
         mut requests_rx: mpsc::Receiver<RpcRequests>,
     ) -> anyhow::Result<()> {
         let mut latest_blockhash_storage = LatestBlockhashStorage::default();
         let mut slots_info = BTreeMap::<Slot, StreamsSlotInfo>::new();
+        let mut leader_schedule_map = HashMap::new();
+        let mut leader_schedule_rpc_map = HashMap::new();
 
         loop {
             tokio::select! {
                 biased;
 
-                maybe_message = geyser_rx.recv() => match maybe_message {
-                    Some(Some(message)) => match message {
+                maybe_message = redis_rx.recv() => match maybe_message {
+                    Some(Some(RedisMessage::Geyser(message))) => match message {
                         GeyserMessage::Status { slot, commitment } => {
                             latest_blockhash_storage.update_commitment(slot, commitment);
 
@@ -619,6 +622,12 @@ impl SolanaRpc {
 
                             let _ = streams_tx.send(Arc::new(StreamsUpdateMessage::Slot { info }));
                         }
+                    }
+                    Some(Some(RedisMessage::Epoch { epoch, leader_schedule, leader_schedule_rpc })) => {
+                        info!(epoch, "epoch received");
+                        leader_schedule_map.insert(epoch, leader_schedule);
+                        leader_schedule_rpc_map.insert(epoch, leader_schedule_rpc);
+                        continue;
                     }
                     _ => break,
                 },
