@@ -781,17 +781,15 @@ impl SolanaRpc {
                                             });
                                             let epoch = epoch_schedule.get_epoch(slot);
 
-                                            let mut map = HashMap::new();
-                                            let leader_schedule = if let Some(identity) = identity {
+                                            if let Some(identity) = identity {
+                                                let mut map = HashMap::new();
                                                 if let Some(slots) = leader_schedule_rpc_map.get(&epoch).and_then(|m| m.get(&identity)) {
-                                                    map.insert(identity, slots.clone());
+                                                    map.insert(identity, slots);
                                                 }
-                                                Some(&map)
+                                                Self::create_success(jsonrpc, id, Some(&map))
                                             } else {
-                                                leader_schedule_rpc_map.get(&epoch)
-                                            };
-
-                                            Self::create_success(jsonrpc, id, leader_schedule)
+                                                Self::create_success(jsonrpc, id, leader_schedule_rpc_map.get(&epoch))
+                                            }
                                         }
                                     }
                                     RpcRequest::RecentPrioritizationFees { jsonrpc, id, pubkeys, percentile } => {
