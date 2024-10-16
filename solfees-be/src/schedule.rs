@@ -1,5 +1,9 @@
 use {
     anyhow::Context,
+    serde::{
+        ser::{SerializeSeq, Serializer},
+        Serialize,
+    },
     solana_client::nonblocking::rpc_client::RpcClient,
     solana_sdk::{
         clock::{Epoch, Slot},
@@ -9,6 +13,7 @@ use {
     },
     std::{
         collections::HashMap,
+        ops::{Deref, DerefMut},
         sync::{Arc, Mutex},
     },
     tokio::sync::mpsc,
@@ -112,9 +117,39 @@ impl SolanaSchedule {
 pub type LeaderScheduleRpc = HashMap<String, Vec<usize>>;
 
 #[derive(Debug)]
+struct LeaderScheduleIndices(Box<[u16; 432_000]>);
+
+impl Deref for LeaderScheduleIndices {
+    type Target = Box<[u16; 432_000]>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for LeaderScheduleIndices {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl Serialize for LeaderScheduleIndices {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut seq = serializer.serialize_seq(Some(432_000))?;
+        for index in self.0.iter() {
+            seq.serialize_element(index)?;
+        }
+        seq.end()
+    }
+}
+
+#[derive(Debug, Serialize)]
 pub struct LeadersSchedule {
     leaders: Vec<Pubkey>,
-    indices: Box<[u16; 432_000]>,
+    indices: LeaderScheduleIndices,
 }
 
 impl LeadersSchedule {
@@ -122,7 +157,7 @@ impl LeadersSchedule {
         let mut map = HashMap::<Pubkey, u16>::new();
 
         let mut leaders = Vec::with_capacity(4096);
-        let mut indices = Box::new([0; 432_000]);
+        let mut indices = LeaderScheduleIndices(Box::new([0; 432_000]));
 
         for (leader, leader_schedule) in schedule.iter() {
             let leader = leader.parse().context("failed to parse leader key")?;

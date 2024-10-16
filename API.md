@@ -42,6 +42,19 @@ with `cURL`:
 curl https://api.solfees.io/api/solana -X POST -H "Content-Type: application/json" -d '{"method":"getLatestBlockhash","jsonrpc":"2.0","params":[{"commitment": "confirmed", "min_context_slot": null}],"id":"1"}'
 ```
 
+### `getLeaderSchedule`
+
+defaults:
+
+  - `commitment`: `finalized`
+  - `slot`: `null`
+  - `identity`: `null`
+
+```
+> {"method":"getLeaderSchedule","jsonrpc":"2.0","params":[{"identity":"yJeahQNRHNWtL9Z1SqPX3SBwTYXr5ECMYYVK4uYVwxt"}],"id":1}
+< {"jsonrpc":"2.0","result":{"yJeahQNRHNWtL9Z1SqPX3SBwTYXr5ECMYYVK4uYVwxt":[6004,6005,6006,6007,84712,84713,84714,84715,160772,160773,160774,160775,203556,203557,203558,203559,225376,225377,225378,225379,256244,256245,256246,256247,319464,319465,319466,319467,374492,374493,374494,374495,385044,385045,385046,385047]},"id":1}>
+```
+
 ### `getRecentPrioritizationFees`
 
 defaults:
@@ -90,6 +103,10 @@ defaults:
 < {"jsonrpc":"2.0","result":{"context":{"apiVersion":"2.0.8","slot":291299118},"value":{"blockhash":"7uEAgwnqXrA7VEjDuRninCbKkAeJNYY1zMMorvRMdZnH","lastValidBlockHeight":270196625}},"id":"1"}
 ```
 
+### `getLeaderSchedule`
+
+No changes compare to Solana API.
+
 ### `getRecentPrioritizationFees`
 
 defaults:
@@ -119,6 +136,10 @@ Supported methods:
 ### `getLatestBlockhash`
 
 No changes compare to Solana API patched by Triton.
+
+### `getLeaderSchedule`
+
+No changes compare to Solana API.
 
 ### `getRecentPrioritizationFees`
 

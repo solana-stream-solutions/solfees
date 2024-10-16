@@ -18,7 +18,7 @@ use {
     },
     serde::{Deserialize, Serialize},
     solana_rpc_client_api::{
-        config::RpcContextConfig,
+        config::{RpcContextConfig, RpcLeaderScheduleConfig, RpcLeaderScheduleConfigWrapper},
         custom_error::RpcCustomError,
         response::{
             Response as RpcResponse, RpcBlockhash, RpcPrioritizationFee, RpcResponseContext,
@@ -26,7 +26,8 @@ use {
         },
     },
     solana_sdk::{
-        clock::{Slot, UnixTimestamp, MAX_RECENT_BLOCKHASHES},
+        clock::{Epoch, Slot, UnixTimestamp, MAX_RECENT_BLOCKHASHES},
+        epoch_schedule::EpochSchedule,
         hash::Hash,
         pubkey::Pubkey,
         transaction::MAX_TX_ACCOUNT_LOCKS,
@@ -205,6 +206,78 @@ impl SolanaRpc {
                             None
                         }
                         Err(error) => Some(Self::create_failure(call.jsonrpc, call.id, error)),
+                    });
+                }
+                "getLeaderSchedule" => {
+                    metrics::requests_call_inc(mode, RpcRequestType::LeaderSchedule);
+
+                    let maybe_request = match mode {
+                        SolanaRpcMode::Solana | SolanaRpcMode::Triton | SolanaRpcMode::Solfees => {
+                            #[derive(Debug, Deserialize)]
+                            struct ReqParams {
+                                #[serde(default)]
+                                options: Option<RpcLeaderScheduleConfigWrapper>,
+                                #[serde(default)]
+                                config: Option<RpcLeaderScheduleConfig>,
+                            }
+
+                            call.params
+                                .parse()
+                                .and_then(|ReqParams { options, config }| {
+                                    let (slot, maybe_config) =
+                                        options.map(|options| options.unzip()).unwrap_or_default();
+                                    let config = maybe_config.or(config).unwrap_or_default();
+
+                                    if let Some(identity) = &config.identity {
+                                        let _ = verify_pubkey(identity)?;
+                                    }
+
+                                    Ok(RpcRequest::LeaderSchedule {
+                                        jsonrpc: call.jsonrpc,
+                                        id: call.id.clone(),
+                                        slot,
+                                        epoch: None,
+                                        commitment: config.commitment.unwrap_or_default().into(),
+                                        identity: config.identity,
+                                    })
+                                })
+                        }
+                        SolanaRpcMode::SolfeesFrontend => {
+                            #[derive(Debug, Deserialize)]
+                            struct ConfigEpoch {
+                                epoch: Epoch,
+                            }
+
+                            #[derive(Debug, Deserialize)]
+                            struct ReqParams {
+                                config: ConfigEpoch,
+                            }
+
+                            call.params.parse().map(
+                                |ReqParams {
+                                     config: ConfigEpoch { epoch },
+                                 }| {
+                                    RpcRequest::LeaderSchedule {
+                                        jsonrpc: call.jsonrpc,
+                                        id: call.id.clone(),
+                                        slot: None,
+                                        epoch: Some(epoch),
+                                        commitment: CommitmentLevel::default(),
+                                        identity: None,
+                                    }
+                                },
+                            )
+                        }
+                    };
+
+                    outputs.push(match maybe_request {
+                        Ok(request) => {
+                            requests.push(request);
+                            None
+                        }
+                        Err(error) => {
+                            Some(Self::create_failure(call.jsonrpc, call.id.clone(), error))
+                        }
                     });
                 }
                 "getRecentPrioritizationFees" => {
@@ -582,6 +655,8 @@ impl SolanaRpc {
     ) -> anyhow::Result<()> {
         let mut latest_blockhash_storage = LatestBlockhashStorage::default();
         let mut slots_info = BTreeMap::<Slot, StreamsSlotInfo>::new();
+
+        let epoch_schedule = EpochSchedule::custom(432_000, 432_000, false);
         let mut leader_schedule_map = HashMap::new();
         let mut leader_schedule_rpc_map = HashMap::new();
 
@@ -693,6 +768,32 @@ impl SolanaRpc {
                                             },
                                         })
                                     }
+                                    RpcRequest::LeaderSchedule { jsonrpc, id, slot, epoch, commitment, identity } => {
+                                        if let Some(epoch) = epoch {
+                                            Self::create_success(jsonrpc, id, leader_schedule_map.get(&epoch))
+                                        } else {
+                                            let slot = slot.unwrap_or({
+                                                match commitment {
+                                                    CommitmentLevel::Processed => latest_blockhash_storage.slot_processed,
+                                                    CommitmentLevel::Confirmed => latest_blockhash_storage.slot_confirmed,
+                                                    CommitmentLevel::Finalized => latest_blockhash_storage.slot_finalized,
+                                                }
+                                            });
+                                            let epoch = epoch_schedule.get_epoch(slot);
+
+                                            let mut map = HashMap::new();
+                                            let leader_schedule = if let Some(identity) = identity {
+                                                if let Some(slots) = leader_schedule_rpc_map.get(&epoch).and_then(|m| m.get(&identity)) {
+                                                    map.insert(identity, slots.clone());
+                                                }
+                                                Some(&map)
+                                            } else {
+                                                leader_schedule_rpc_map.get(&epoch)
+                                            };
+
+                                            Self::create_success(jsonrpc, id, leader_schedule)
+                                        }
+                                    }
                                     RpcRequest::RecentPrioritizationFees { jsonrpc, id, pubkeys, percentile } => {
                                         let result = slots_info
                                             .iter()
@@ -794,6 +895,7 @@ struct RpcRequests {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RpcRequestType {
     LatestBlockhash,
+    LeaderSchedule,
     RecentPrioritizationFees,
     Slot,
     Version,
@@ -807,6 +909,14 @@ enum RpcRequest {
         commitment: CommitmentLevel,
         rollback: usize,
         min_context_slot: Option<Slot>,
+    },
+    LeaderSchedule {
+        jsonrpc: Option<JsonrpcVersion>,
+        id: JsonrpcId,
+        slot: Option<Slot>,
+        epoch: Option<Epoch>,
+        commitment: CommitmentLevel,
+        identity: Option<String>,
     },
     RecentPrioritizationFees {
         jsonrpc: Option<JsonrpcVersion>,
