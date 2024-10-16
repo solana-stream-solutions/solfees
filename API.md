@@ -160,3 +160,23 @@ Total number of `readWrite` + `readOnly` accounts should be less than 128. Up to
 < {"result":{"status":{"commitment":"confirmed","slot":292109053}},"id":0}
 < {"result":{"status":{"commitment":"confirmed","slot":292109054}},"id":0}
 ```
+
+With `solfees-ws-client` tool from the repo:
+
+```
+$ cargo run --bin solfees-ws-client -- --read-only TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
+   Compiling solfees-be v1.0.0 (/home/kirill/projects/solfees-public/solfees-be)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.14s
+     Running `target/debug/solfees-ws-client --read-only TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA`
+2024-10-16T10:49:40.876707Z  INFO solfees_ws_client: new message: {"result":"subscribed","id":0}
+2024-10-16T10:49:41.185825Z  INFO solfees_ws_client: new message: {"result":{"status":{"commitment":"confirmed","slot":295932428}},"id":0}
+2024-10-16T10:49:41.185882Z  INFO solfees_ws_client: new message: {"result":{"slot":{"commitment":"processed","feeAverage":79729.71717171717,"feeLevels":[0,0,356241],"height":274652614,"slot":295932429,"totalTransactions":1586,"totalTransactionsFiltered":99,"totalTransactionsVote":1284}},"id":0}
+2024-10-16T10:49:41.185923Z  INFO solfees_ws_client: new message: {"result":{"status":{"commitment":"processed","slot":295932429}},"id":0}
+2024-10-16T10:49:41.185941Z  INFO solfees_ws_client: new message: {"result":{"status":{"commitment":"finalized","slot":295932398}},"id":0}
+2024-10-16T10:49:41.428988Z  INFO solfees_ws_client: new message: {"result":{"status":{"commitment":"confirmed","slot":295932429}},"id":0}
+2024-10-16T10:49:41.695999Z  INFO solfees_ws_client: new message: {"result":{"slot":{"commitment":"processed","feeAverage":792214.4206896551,"feeLevels":[0,0,356241],"height":274652615,"slot":295932430,"totalTransactions":1505,"totalTransactionsFiltered":145,"totalTransactionsVote":1236}},"id":0}
+2024-10-16T10:49:41.696041Z  INFO solfees_ws_client: new message: {"result":{"status":{"commitment":"processed","slot":295932430}},"id":0}
+2024-10-16T10:49:41.696058Z  INFO solfees_ws_client: new message: {"result":{"status":{"commitment":"finalized","slot":295932399}},"id":0}
+2024-10-16T10:49:41.971094Z  INFO solfees_ws_client: new message: {"result":{"status":{"commitment":"confirmed","slot":295932430}},"id":0}
+2024-10-16T10:49:42.314014Z  INFO solfees_ws_client: new message: {"result":{"slot":{"commitment":"processed","feeAverage":5634600.90821256,"feeLevels":[0,200000,8431933],"height":274652616,"slot":295932431,"totalTransactions":1195,"totalTransactionsFiltered":207,"totalTransactionsVote":823}},"id":0}
+```

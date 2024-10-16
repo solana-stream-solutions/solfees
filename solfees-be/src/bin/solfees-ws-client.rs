@@ -2,6 +2,7 @@ use {
     anyhow::Context,
     clap::Parser,
     futures::{future::TryFutureExt, stream::StreamExt},
+    serde::Serialize,
     tokio_tungstenite::{connect_async, tungstenite::protocol::Message},
     tracing::info,
 };
@@ -9,8 +10,28 @@ use {
 #[derive(Debug, Clone, Parser)]
 #[clap(author, version, about)]
 struct Args {
-    #[clap(short, long, default_value_t = String::from("wss://api.solfees.io/api/solfees/ws"))]
+    #[clap(short, long, default_value_t = String::from("wss://api.solfees.io/api/solana/solfees/ws"))]
     endpoint: String,
+
+    /// Select transactions where mentioned accounts are readWrite
+    #[clap(long)]
+    read_write: Option<Vec<String>>,
+
+    /// Select transactions where mentioned accounts are readOnly
+    #[clap(long)]
+    read_only: Option<Vec<String>>,
+
+    /// Up to 5 levels (bps)
+    #[clap(long, default_values_t = [2000, 5000, 9000])]
+    levels: Vec<u16>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SubscriptionParams {
+    read_write: Vec<String>,
+    read_only: Vec<String>,
+    levels: Vec<u16>,
 }
 
 #[tokio::main]
@@ -18,6 +39,16 @@ async fn main() -> anyhow::Result<()> {
     solfees_be::tracing::init(false)?;
 
     let args = Args::parse();
+    let request = serde_json::to_string(&serde_json::json!({
+        "id": 0,
+        "method": "SlotsSubscribe",
+        "params": SubscriptionParams {
+            read_write: args.read_write.unwrap_or_default(),
+            read_only: args.read_only.unwrap_or_default(),
+            levels: args.levels,
+        }
+    }))
+    .context("failed to create request")?;
 
     let (ws_stream, _) = connect_async(args.endpoint)
         .await
@@ -25,8 +56,7 @@ async fn main() -> anyhow::Result<()> {
     let (ws_write, mut ws_read) = ws_stream.split();
 
     let (req_tx, req_rx) = futures::channel::mpsc::unbounded();
-    let text = r#"{"id":0,"method":"SlotsSubscribe","params":{"readWrite":[],"readOnly":["TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"],"levels":[5000,9000]}}"#.to_owned();
-    req_tx.unbounded_send(Message::text(text))?;
+    req_tx.unbounded_send(Message::text(request))?;
 
     let req_to_ws = req_rx.map(Ok).forward(ws_write).map_err(Into::into);
     let ws_to_stdout = async move {

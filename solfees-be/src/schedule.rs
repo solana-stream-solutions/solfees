@@ -33,7 +33,7 @@ impl SolanaSchedule {
         for (epoch, leader_schedule_rpc) in saved_epochs {
             if let Ok(leader_schedule) = LeadersSchedule::new(&leader_schedule_rpc) {
                 map.insert(epoch, Some(leader_schedule));
-                info!(epoch, "epoch schedule saved");
+                info!(epoch, "use preloaded schedule");
             }
         }
 
