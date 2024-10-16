@@ -2,6 +2,7 @@ use {
     crate::{
         grpc_geyser::{CommitmentLevel, GeyserMessage, GeyserTransaction},
         metrics::solfees_be as metrics,
+        redis::RedisMessage,
     },
     futures::{
         future::{pending, FutureExt},
@@ -17,7 +18,7 @@ use {
     },
     serde::{Deserialize, Serialize},
     solana_rpc_client_api::{
-        config::RpcContextConfig,
+        config::{RpcContextConfig, RpcLeaderScheduleConfig, RpcLeaderScheduleConfigWrapper},
         custom_error::RpcCustomError,
         response::{
             Response as RpcResponse, RpcBlockhash, RpcPrioritizationFee, RpcResponseContext,
@@ -25,7 +26,8 @@ use {
         },
     },
     solana_sdk::{
-        clock::{Slot, UnixTimestamp, MAX_RECENT_BLOCKHASHES},
+        clock::{Epoch, Slot, UnixTimestamp, MAX_RECENT_BLOCKHASHES},
+        epoch_schedule::EpochSchedule,
         hash::Hash,
         pubkey::Pubkey,
         transaction::MAX_TX_ACCOUNT_LOCKS,
@@ -48,7 +50,7 @@ use {
         frame::{coding::CloseCode as WebSocketCloseCode, CloseFrame as WebSocketCloseFrame},
         Message as WebSocketMessage,
     },
-    tracing::debug,
+    tracing::{debug, info},
 };
 
 const MAX_NUM_RECENT_SLOT_INFO: usize = 150;
@@ -65,7 +67,7 @@ pub enum SolanaRpcMode {
 pub struct SolanaRpc {
     request_calls_max: usize,
     request_timeout: Duration,
-    geyser_tx: mpsc::UnboundedSender<Option<GeyserMessage>>,
+    redis_tx: mpsc::UnboundedSender<Option<RedisMessage>>,
     requests_tx: mpsc::Sender<RpcRequests>,
     streams_tx: broadcast::Sender<Arc<StreamsUpdateMessage>>,
 }
@@ -77,7 +79,7 @@ impl SolanaRpc {
         request_queue_max: usize,
         streams_channel_capacity: usize,
     ) -> (Self, impl Future<Output = anyhow::Result<()>>) {
-        let (geyser_tx, geyser_rx) = mpsc::unbounded_channel();
+        let (redis_tx, redis_rx) = mpsc::unbounded_channel();
         let (streams_tx, _streams_rx) = broadcast::channel(streams_channel_capacity);
         let (requests_tx, requests_rx) = mpsc::channel(request_queue_max);
 
@@ -85,25 +87,25 @@ impl SolanaRpc {
             Self {
                 request_calls_max,
                 request_timeout,
-                geyser_tx,
+                redis_tx,
                 requests_tx,
                 streams_tx: streams_tx.clone(),
             },
-            Self::run_update_loop(geyser_rx, streams_tx, requests_rx),
+            Self::run_update_loop(redis_rx, streams_tx, requests_rx),
         )
     }
 
     pub fn shutdown(&self) -> anyhow::Result<()> {
         anyhow::ensure!(
-            self.geyser_tx.send(None).is_ok(),
+            self.redis_tx.send(None).is_ok(),
             "SolanaRpc update loop is dead"
         );
         Ok(())
     }
 
-    pub fn push_geyser_message(&self, message: GeyserMessage) -> anyhow::Result<()> {
+    pub fn push_redis_message(&self, message: RedisMessage) -> anyhow::Result<()> {
         anyhow::ensure!(
-            self.geyser_tx.send(Some(message)).is_ok(),
+            self.redis_tx.send(Some(message)).is_ok(),
             "SolanaRpc update loop is dead"
         );
         Ok(())
@@ -204,6 +206,78 @@ impl SolanaRpc {
                             None
                         }
                         Err(error) => Some(Self::create_failure(call.jsonrpc, call.id, error)),
+                    });
+                }
+                "getLeaderSchedule" => {
+                    metrics::requests_call_inc(mode, RpcRequestType::LeaderSchedule);
+
+                    let maybe_request = match mode {
+                        SolanaRpcMode::Solana | SolanaRpcMode::Triton | SolanaRpcMode::Solfees => {
+                            #[derive(Debug, Deserialize)]
+                            struct ReqParams {
+                                #[serde(default)]
+                                options: Option<RpcLeaderScheduleConfigWrapper>,
+                                #[serde(default)]
+                                config: Option<RpcLeaderScheduleConfig>,
+                            }
+
+                            call.params
+                                .parse()
+                                .and_then(|ReqParams { options, config }| {
+                                    let (slot, maybe_config) =
+                                        options.map(|options| options.unzip()).unwrap_or_default();
+                                    let config = maybe_config.or(config).unwrap_or_default();
+
+                                    if let Some(identity) = &config.identity {
+                                        let _ = verify_pubkey(identity)?;
+                                    }
+
+                                    Ok(RpcRequest::LeaderSchedule {
+                                        jsonrpc: call.jsonrpc,
+                                        id: call.id.clone(),
+                                        slot,
+                                        epoch: None,
+                                        commitment: config.commitment.unwrap_or_default().into(),
+                                        identity: config.identity,
+                                    })
+                                })
+                        }
+                        SolanaRpcMode::SolfeesFrontend => {
+                            #[derive(Debug, Deserialize)]
+                            struct ConfigEpoch {
+                                epoch: Epoch,
+                            }
+
+                            #[derive(Debug, Deserialize)]
+                            struct ReqParams {
+                                config: ConfigEpoch,
+                            }
+
+                            call.params.parse().map(
+                                |ReqParams {
+                                     config: ConfigEpoch { epoch },
+                                 }| {
+                                    RpcRequest::LeaderSchedule {
+                                        jsonrpc: call.jsonrpc,
+                                        id: call.id.clone(),
+                                        slot: None,
+                                        epoch: Some(epoch),
+                                        commitment: CommitmentLevel::default(),
+                                        identity: None,
+                                    }
+                                },
+                            )
+                        }
+                    };
+
+                    outputs.push(match maybe_request {
+                        Ok(request) => {
+                            requests.push(request);
+                            None
+                        }
+                        Err(error) => {
+                            Some(Self::create_failure(call.jsonrpc, call.id.clone(), error))
+                        }
                     });
                 }
                 "getRecentPrioritizationFees" => {
@@ -575,19 +649,23 @@ impl SolanaRpc {
     }
 
     async fn run_update_loop(
-        mut geyser_rx: mpsc::UnboundedReceiver<Option<GeyserMessage>>,
+        mut redis_rx: mpsc::UnboundedReceiver<Option<RedisMessage>>,
         streams_tx: broadcast::Sender<Arc<StreamsUpdateMessage>>,
         mut requests_rx: mpsc::Receiver<RpcRequests>,
     ) -> anyhow::Result<()> {
         let mut latest_blockhash_storage = LatestBlockhashStorage::default();
         let mut slots_info = BTreeMap::<Slot, StreamsSlotInfo>::new();
 
+        let epoch_schedule = EpochSchedule::custom(432_000, 432_000, false);
+        let mut leader_schedule_map = HashMap::new();
+        let mut leader_schedule_rpc_map = HashMap::new();
+
         loop {
             tokio::select! {
                 biased;
 
-                maybe_message = geyser_rx.recv() => match maybe_message {
-                    Some(Some(message)) => match message {
+                maybe_message = redis_rx.recv() => match maybe_message {
+                    Some(Some(RedisMessage::Geyser(message))) => match message {
                         GeyserMessage::Status { slot, commitment } => {
                             latest_blockhash_storage.update_commitment(slot, commitment);
 
@@ -619,6 +697,12 @@ impl SolanaRpc {
 
                             let _ = streams_tx.send(Arc::new(StreamsUpdateMessage::Slot { info }));
                         }
+                    }
+                    Some(Some(RedisMessage::Epoch { epoch, leader_schedule, leader_schedule_rpc })) => {
+                        info!(epoch, "epoch received");
+                        leader_schedule_map.insert(epoch, leader_schedule);
+                        leader_schedule_rpc_map.insert(epoch, leader_schedule_rpc);
+                        continue;
                     }
                     _ => break,
                 },
@@ -683,6 +767,30 @@ impl SolanaRpc {
                                                 last_valid_block_height: value.height + MAX_RECENT_BLOCKHASHES as u64,
                                             },
                                         })
+                                    }
+                                    RpcRequest::LeaderSchedule { jsonrpc, id, slot, epoch, commitment, identity } => {
+                                        if let Some(epoch) = epoch {
+                                            Self::create_success(jsonrpc, id, leader_schedule_map.get(&epoch))
+                                        } else {
+                                            let slot = slot.unwrap_or({
+                                                match commitment {
+                                                    CommitmentLevel::Processed => latest_blockhash_storage.slot_processed,
+                                                    CommitmentLevel::Confirmed => latest_blockhash_storage.slot_confirmed,
+                                                    CommitmentLevel::Finalized => latest_blockhash_storage.slot_finalized,
+                                                }
+                                            });
+                                            let epoch = epoch_schedule.get_epoch(slot);
+
+                                            if let Some(identity) = identity {
+                                                let mut map = HashMap::new();
+                                                if let Some(slots) = leader_schedule_rpc_map.get(&epoch).and_then(|m| m.get(&identity)) {
+                                                    map.insert(identity, slots);
+                                                }
+                                                Self::create_success(jsonrpc, id, Some(&map))
+                                            } else {
+                                                Self::create_success(jsonrpc, id, leader_schedule_rpc_map.get(&epoch))
+                                            }
+                                        }
                                     }
                                     RpcRequest::RecentPrioritizationFees { jsonrpc, id, pubkeys, percentile } => {
                                         let result = slots_info
@@ -785,6 +893,7 @@ struct RpcRequests {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RpcRequestType {
     LatestBlockhash,
+    LeaderSchedule,
     RecentPrioritizationFees,
     Slot,
     Version,
@@ -798,6 +907,14 @@ enum RpcRequest {
         commitment: CommitmentLevel,
         rollback: usize,
         min_context_slot: Option<Slot>,
+    },
+    LeaderSchedule {
+        jsonrpc: Option<JsonrpcVersion>,
+        id: JsonrpcId,
+        slot: Option<Slot>,
+        epoch: Option<Epoch>,
+        commitment: CommitmentLevel,
+        identity: Option<String>,
     },
     RecentPrioritizationFees {
         jsonrpc: Option<JsonrpcVersion>,

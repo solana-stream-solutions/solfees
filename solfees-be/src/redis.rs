@@ -2,13 +2,40 @@ use {
     crate::{
         config::ConfigRedisConsumer,
         grpc_geyser::{CommitmentLevel, GeyserMessage},
+        schedule::{LeaderScheduleRpc, LeadersSchedule},
     },
     anyhow::Context,
     lru::LruCache,
     redis::{streams::StreamReadReply, AsyncConnectionConfig, Client, Value as RedisValue},
-    std::{num::NonZeroUsize, time::Duration},
+    solana_sdk::{clock::Epoch, epoch_schedule::EpochSchedule},
+    std::{collections::HashSet, num::NonZeroUsize, time::Duration},
     tokio::{sync::mpsc, time::sleep},
 };
+
+#[derive(Debug)]
+pub enum RedisMessage {
+    Geyser(GeyserMessage),
+    Epoch {
+        epoch: Epoch,
+        leader_schedule: LeadersSchedule,
+        leader_schedule_rpc: LeaderScheduleRpc,
+    },
+}
+
+impl RedisMessage {
+    fn build_epoch(epoch: Epoch, data: &[u8]) -> anyhow::Result<Self> {
+        let leader_schedule_rpc: LeaderScheduleRpc = bincode::deserialize(data)
+            .with_context(|| format!("failed to deserialie epoch {epoch}"))?;
+        let leader_schedule = LeadersSchedule::new(&leader_schedule_rpc)
+            .with_context(|| format!("failed to build schedule for epoch {epoch}"))?;
+
+        Ok(Self::Epoch {
+            epoch,
+            leader_schedule,
+            leader_schedule_rpc,
+        })
+    }
+}
 
 #[derive(Debug, Default, Clone, Copy)]
 struct SeenSlot {
@@ -20,7 +47,9 @@ struct SeenSlot {
 
 pub async fn subscribe(
     config: ConfigRedisConsumer,
-) -> anyhow::Result<mpsc::UnboundedReceiver<anyhow::Result<GeyserMessage>>> {
+) -> anyhow::Result<mpsc::UnboundedReceiver<anyhow::Result<RedisMessage>>> {
+    let mut epochs = HashSet::new();
+
     let client = Client::open(config.endpoint).context("failed to create Redis client")?;
     let mut connection = client
         .get_multiplexed_async_connection_with_config(
@@ -34,9 +63,66 @@ pub async fn subscribe(
         NonZeroUsize::new(8_192).ok_or(anyhow::anyhow!("failed to create LRU capacity"))?,
     );
     tokio::spawn(async move {
+        match redis::cmd("HGETALL")
+            .arg(&config.epochs_key)
+            .query_async::<Vec<(Epoch, Vec<u8>)>>(&mut connection)
+            .await
+        {
+            Ok(value) => {
+                for (epoch, data) in value {
+                    let msg = RedisMessage::build_epoch(epoch, &data);
+
+                    let alive = msg.is_ok();
+                    if tx.send(msg).is_err() || !alive {
+                        return;
+                    }
+
+                    epochs.insert(epoch);
+                }
+            }
+            Err(error) => {
+                let _ = tx.send(Err(error.into()));
+                return;
+            }
+        };
+
+        let epoch_schedule = EpochSchedule::custom(432_000, 432_000, false);
+        let mut epochs_queue = vec![];
         let mut finalized_slot_tip = 0;
         let mut latest_id = "0".to_owned();
-        'outer: loop {
+        loop {
+            if !epochs_queue.is_empty() {
+                let mut pipe = redis::pipe();
+                pipe.cmd("HMGET").arg(&config.epochs_key);
+                for slot in epochs_queue.iter() {
+                    pipe.arg(*slot);
+                }
+
+                match pipe
+                    .query_async::<Vec<Vec<Option<Vec<u8>>>>>(&mut connection)
+                    .await
+                {
+                    Ok(value) => {
+                        for (epoch, maybe_data) in epochs_queue.drain(..).zip(value.into_iter()) {
+                            if let Some(Some(data)) = maybe_data.first() {
+                                let msg = RedisMessage::build_epoch(epoch, data);
+
+                                let alive = msg.is_ok();
+                                if tx.send(msg).is_err() || !alive {
+                                    return;
+                                }
+
+                                epochs.insert(epoch);
+                            }
+                        }
+                    }
+                    Err(error) => {
+                        let _ = tx.send(Err(error.into()));
+                        return;
+                    }
+                };
+            }
+
             let mut stream_keys = match redis::cmd("XREAD")
                 .arg("COUNT")
                 .arg(5)
@@ -49,7 +135,7 @@ pub async fn subscribe(
                 Ok(StreamReadReply { keys }) => keys,
                 Err(error) => {
                     let _ = tx.send(Err(error.into()));
-                    break;
+                    return;
                 }
             };
 
@@ -65,7 +151,7 @@ pub async fn subscribe(
                     stream_id.map.get(&config.stream_field_key)
                 else {
                     let _ = tx.send(Err(anyhow::anyhow!("failed to get payload from StreamId")));
-                    break 'outer;
+                    return;
                 };
 
                 let message = bincode::deserialize(payload).context("failed to decode payload");
@@ -96,10 +182,15 @@ pub async fn subscribe(
                         continue;
                     }
                     *seen = true;
+
+                    let epoch = epoch_schedule.get_epoch(slot);
+                    if commitment.is_none() && !epochs.contains(&epoch) {
+                        epochs_queue.push(epoch);
+                    }
                 }
 
-                if tx.send(message).is_err() {
-                    break 'outer;
+                if tx.send(message.map(RedisMessage::Geyser)).is_err() {
+                    return;
                 }
             }
         }

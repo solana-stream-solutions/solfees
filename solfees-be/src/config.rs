@@ -84,6 +84,7 @@ pub struct ConfigRedisPublisher {
     pub stream_key: String,
     pub stream_maxlen: u64,
     pub stream_field_key: String,
+    pub epochs_key: String,
 }
 
 impl Default for ConfigRedisPublisher {
@@ -93,6 +94,7 @@ impl Default for ConfigRedisPublisher {
             stream_key: "solfees:events".to_owned(),
             stream_maxlen: 15 * 60 * 3 * 4, // ~15min (2.5 slots per sec, 4 events per slot)
             stream_field_key: "message".to_owned(),
+            epochs_key: "solfees:epochs".to_owned(),
         }
     }
 }
@@ -133,6 +135,7 @@ pub struct ConfigRedisConsumer {
     pub endpoint: String,
     pub stream_key: String,
     pub stream_field_key: String,
+    pub epochs_key: String,
 }
 
 impl Default for ConfigRedisConsumer {
@@ -141,6 +144,7 @@ impl Default for ConfigRedisConsumer {
             endpoint: "redis://127.0.0.1:6379/".to_owned(),
             stream_key: "solfees:events".to_owned(),
             stream_field_key: "message".to_owned(),
+            epochs_key: "solfees:epochs".to_owned(),
         }
     }
 }

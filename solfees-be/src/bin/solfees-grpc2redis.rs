@@ -2,6 +2,7 @@ use {
     anyhow::Context,
     futures::future::{try_join_all, FutureExt, TryFutureExt},
     redis::{AsyncConnectionConfig, Client},
+    solana_sdk::clock::Epoch,
     solfees_be::{
         cli,
         config::ConfigGrpc2Redis as Config,
@@ -39,10 +40,24 @@ async fn main2(config: Config) -> anyhow::Result<()> {
         .await
         .context("failed to get Redis connection")?;
 
-    let mut geyser_rx = grpc_geyser::subscribe(
+    let saved_epochs = redis::cmd("HGETALL")
+        .arg(&config.redis.epochs_key)
+        .query_async::<Vec<(Epoch, Vec<u8>)>>(&mut connection)
+        .await
+        .context("failed to fetch epochs from Redis")?
+        .into_iter()
+        .map(|(epoch, data)| {
+            bincode::deserialize(&data)
+                .with_context(|| format!("failed to deserialie epoch {epoch}"))
+                .map(|schedule| (epoch, schedule))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let (mut geyser_rx, mut schedule_rx) = grpc_geyser::subscribe(
         config.grpc.endpoint,
         config.grpc.x_token,
         config.rpc.endpoint,
+        saved_epochs,
     )
     .await
     .context("failed to open gRPC subscription")?;
@@ -76,6 +91,24 @@ async fn main2(config: Config) -> anyhow::Result<()> {
                     break;
                 }
             }
+            value = schedule_rx.recv() => {
+                let Some((epoch, schedule)) = value else {
+                    error!("schedule stream finished");
+                    break;
+                };
+
+                let _: () = pipe.cmd("HSET")
+                    .arg(&config.redis.epochs_key)
+                    .arg(epoch)
+                    .arg(bincode::serialize(&schedule).context("failed to serialize leader schedule")?)
+                    .ignore()
+                    .atomic()
+                    .query_async(&mut connection)
+                    .await
+                    .context("failed to send epoch schedule to Redis")?;
+
+                continue;
+            }
         };
 
         while let Ok(maybe_message) = geyser_rx.try_recv() {
@@ -98,7 +131,7 @@ async fn main2(config: Config) -> anyhow::Result<()> {
             .atomic()
             .query_async(&mut connection)
             .await
-            .context("failed to send data to Redis")?;
+            .context("failed to send data to Redis stream")?;
 
         metrics::redis_messages_pushed_inc_by(messages.len());
         for message in messages {

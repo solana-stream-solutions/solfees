@@ -70,7 +70,7 @@ async fn main2(config: Config) -> anyhow::Result<()> {
             }
             value = redis_rx.recv() => {
                 if let Some(maybe_message) = value {
-                    solana_rpc.push_geyser_message(maybe_message?)?;
+                    solana_rpc.push_redis_message(maybe_message?)?;
                 } else {
                     error!("redis stream finished");
                     break;

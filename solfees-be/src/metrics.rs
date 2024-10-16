@@ -154,6 +154,7 @@ pub mod solfees_be {
                 },
                 match method {
                     RpcRequestType::LatestBlockhash => "get_latest_blockhash",
+                    RpcRequestType::LeaderSchedule => "get_leader_schedule",
                     RpcRequestType::RecentPrioritizationFees => "get_recent_prioritization_fees",
                     RpcRequestType::Slot => "get_slot",
                     RpcRequestType::Version => "get_version",

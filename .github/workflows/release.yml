@@ -30,12 +30,13 @@ jobs:
       - uses: fanatid/rust-github-ci-prepare@master
 
       - name: build binaries
-        run: cargo build --bin solfees-be --bin solfees-grpc2redis --release
+        run: cargo build --bin solfees-be --bin solfees-grpc2redis --bin solfees-ws-client --release
 
       - name: rename binaries
         run: |
           mv target/release/solfees-be target/release/solfees-be-${{ matrix.is }}
           mv target/release/solfees-grpc2redis target/release/solfees-grpc2redis-${{ matrix.os }}
+          mv target/release/solfees-ws-client target/release/solfees-ws-client-${{ matrix.is }}
 
       - name: upload artifact
         if: startsWith(github.ref, 'refs/tags/') != true
@@ -45,6 +46,7 @@ jobs:
           path: |
             target/release/solfees-be-${{ matrix.os }}
             target/release/solfees-grpc2redis-${{ matrix.os }}
+            target/release/solfees-ws-client-${{ matrix.os }}
 
       - name: upload release
         if: startsWith(github.ref, 'refs/tags/')
@@ -54,3 +56,4 @@ jobs:
           files: |
             target/release/solfees-be-${{ matrix.os }}
             target/release/solfees-grpc2redis-${{ matrix.os }}
+            target/release/solfees-ws-client-${{ matrix.os }}
