@@ -25,12 +25,23 @@ pub struct SolanaSchedule {
 }
 
 impl SolanaSchedule {
-    pub fn new(endpoint: String) -> (Self, mpsc::UnboundedReceiver<(Epoch, LeaderScheduleRpc)>) {
+    pub fn new(
+        endpoint: String,
+        saved_epochs: Vec<(Epoch, LeaderScheduleRpc)>,
+    ) -> (Self, mpsc::UnboundedReceiver<(Epoch, LeaderScheduleRpc)>) {
+        let mut map = HashMap::new();
+        for (epoch, leader_schedule_rpc) in saved_epochs {
+            if let Ok(leader_schedule) = LeadersSchedule::new(&leader_schedule_rpc) {
+                map.insert(epoch, Some(leader_schedule));
+                info!(epoch, "epoch schedule saved");
+            }
+        }
+
         let (leader_schedule_tx, leader_schedule_rx) = mpsc::unbounded_channel();
         let schedule = Self {
             rpc: Arc::new(RpcClient::new(endpoint)),
             epoch_schedule: EpochSchedule::custom(432_000, 432_000, false),
-            leader_schedule_by_epoch: Arc::new(Mutex::default()),
+            leader_schedule_by_epoch: Arc::new(Mutex::new(map)),
             leader_schedule_tx,
         };
         (schedule, leader_schedule_rx)

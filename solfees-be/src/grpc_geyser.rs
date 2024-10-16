@@ -301,6 +301,7 @@ pub async fn subscribe<T>(
     grpc_endpoint: String,
     grpc_x_token: Option<T>,
     rpc_endpoint: String,
+    saved_epochs: Vec<(Epoch, LeaderScheduleRpc)>,
 ) -> anyhow::Result<(
     mpsc::UnboundedReceiver<anyhow::Result<GeyserMessage>>,
     mpsc::UnboundedReceiver<(Epoch, LeaderScheduleRpc)>,
@@ -339,7 +340,7 @@ where
         .context("failed to subscribe on geyser stream")?;
 
     let (tx, rx) = mpsc::unbounded_channel();
-    let (schedule, schedule_rx) = SolanaSchedule::new(rpc_endpoint);
+    let (schedule, schedule_rx) = SolanaSchedule::new(rpc_endpoint, saved_epochs);
     tokio::spawn(async move {
         let mut transactions: BTreeMap<Slot, Vec<GeyserTransaction>> = Default::default();
 

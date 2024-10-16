@@ -26,6 +26,7 @@ async fn main() -> anyhow::Result<()> {
         args.grpc_endpoint,
         args.grpc_x_token,
         args.rpc_endpoint,
+        vec![],
     )
     .await?;
     while let Some(message) = geyser_rx.recv().await {
