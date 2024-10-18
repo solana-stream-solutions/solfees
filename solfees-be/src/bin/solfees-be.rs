@@ -14,15 +14,22 @@ fn main() -> anyhow::Result<()> {
 }
 
 async fn main2(config: Config) -> anyhow::Result<()> {
-    let (solana_rpc, solana_rpc_fut) = SolanaRpc::new(
+    let (solana_rpc, solana_rpc_futs) = SolanaRpc::new(
         config.listen_rpc.request_calls_max,
         config.listen_rpc.request_timeout,
         config.listen_rpc.request_queue_max,
         config.listen_rpc.streams_channel_capacity,
+        config.listen_rpc.pool_size,
     );
-    let solana_rpc_fut = tokio::spawn(solana_rpc_fut)
-        .map(|result| result?)
-        .map_err(|error| error.context("SolanaRPC update loop failed"))
+    let solana_rpc_futs =
+        try_join_all(solana_rpc_futs.into_iter().enumerate().map(|(index, fut)| {
+            tokio::spawn(fut)
+                .map(|result| result?)
+                .map_err(move |error| {
+                    error.context(format!("SolanaRPC update loop#{index} failed"))
+                })
+        }))
+        .map_ok(|_vec| ())
         .boxed();
 
     let rpc_admin_shutdown = Arc::new(Notify::new());
@@ -45,7 +52,7 @@ async fn main2(config: Config) -> anyhow::Result<()> {
     .map_err(|error| error.context("Solfees RPC failed"))
     .boxed();
 
-    let mut spawned_tasks = try_join_all(vec![solana_rpc_fut, rpc_admin_fut, rpc_solfees_fut]);
+    let mut spawned_tasks = try_join_all(vec![solana_rpc_futs, rpc_admin_fut, rpc_solfees_fut]);
 
     let mut redis_rx = redis::subscribe(config.redis).await?;
 
@@ -79,7 +86,7 @@ async fn main2(config: Config) -> anyhow::Result<()> {
         }
     }
 
-    solana_rpc.shutdown()?;
+    solana_rpc.shutdown();
     rpc_admin_shutdown.notify_one();
     rpc_solfees_shutdown.notify_one();
 

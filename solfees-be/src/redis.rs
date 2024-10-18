@@ -8,17 +8,17 @@ use {
     lru::LruCache,
     redis::{streams::StreamReadReply, AsyncConnectionConfig, Client, Value as RedisValue},
     solana_sdk::{clock::Epoch, epoch_schedule::EpochSchedule},
-    std::{collections::HashSet, num::NonZeroUsize, time::Duration},
+    std::{collections::HashSet, num::NonZeroUsize, sync::Arc, time::Duration},
     tokio::{sync::mpsc, time::sleep},
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum RedisMessage {
     Geyser(GeyserMessage),
     Epoch {
         epoch: Epoch,
-        leader_schedule: LeadersSchedule,
-        leader_schedule_rpc: LeaderScheduleRpc,
+        leader_schedule: Arc<LeadersSchedule>,
+        leader_schedule_rpc: Arc<LeaderScheduleRpc>,
     },
 }
 
@@ -31,8 +31,8 @@ impl RedisMessage {
 
         Ok(Self::Epoch {
             epoch,
-            leader_schedule,
-            leader_schedule_rpc,
+            leader_schedule: Arc::new(leader_schedule),
+            leader_schedule_rpc: Arc::new(leader_schedule_rpc),
         })
     }
 }

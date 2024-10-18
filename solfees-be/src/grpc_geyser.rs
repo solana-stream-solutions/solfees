@@ -24,7 +24,10 @@ use {
     solana_transaction_status::{
         TransactionStatusMeta, TransactionWithStatusMeta, VersionedTransactionWithStatusMeta,
     },
-    std::collections::{BTreeMap, HashMap, HashSet},
+    std::{
+        collections::{BTreeMap, HashMap, HashSet},
+        sync::Arc,
+    },
     tokio::sync::mpsc,
     tonic::{
         codec::CompressionEncoding,
@@ -248,7 +251,7 @@ impl From<(VersionedTransactionWithStatusMeta, bool)> for GeyserTransaction {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum GeyserMessage {
     Status {
         slot: Slot,
@@ -262,7 +265,7 @@ pub enum GeyserMessage {
         height: Slot,
         parent_slot: Slot,
         parent_hash: Hash,
-        transactions: Vec<GeyserTransaction>,
+        transactions: Arc<Vec<GeyserTransaction>>,
     },
 }
 
@@ -292,7 +295,7 @@ impl GeyserMessage {
                 .parent_blockhash
                 .parse()
                 .context("failed to parse parent block hash")?,
-            transactions,
+            transactions: Arc::new(transactions),
         })
     }
 }

@@ -17,3 +17,4 @@ listen_rpc:
   request_timeout: 60s
   request_queue_max: 1000
   streams_channel_capacity: 150
+  pool_size: 2

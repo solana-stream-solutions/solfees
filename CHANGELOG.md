@@ -14,4 +14,7 @@ The minor version will be incremented upon a breaking change and the patch versi
 
 ### Features
 
+- api: add getLeaderSchedule ([#1](https://github.com/solana-stream-solutions/solfees/pull/1))
+- rpc: run multiple handlers ([#2](https://github.com/solana-stream-solutions/solfees/pull/2))
+
 ### Breaking
