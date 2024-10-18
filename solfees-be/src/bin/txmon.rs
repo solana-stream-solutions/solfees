@@ -49,7 +49,7 @@ async fn main() -> anyhow::Result<()> {
             } => {
                 tracing::debug!("block meta received {slot}");
 
-                for tx in transactions {
+                for tx in transactions.iter() {
                     let extra_fee = tx.unit_limit as u64 * tx.unit_price;
                     let expected_fee = extra_fee / 1_000_000
                         + if extra_fee % 1_000_000 > 0 { 1 } else { 0 }

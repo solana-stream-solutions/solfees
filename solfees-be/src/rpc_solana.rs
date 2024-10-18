@@ -43,7 +43,7 @@ use {
         time::Duration,
     },
     tokio::{
-        sync::{broadcast, mpsc, oneshot},
+        sync::{broadcast, mpsc, oneshot, Mutex},
         time::sleep,
     },
     tokio_tungstenite::tungstenite::protocol::{
@@ -67,7 +67,7 @@ pub enum SolanaRpcMode {
 pub struct SolanaRpc {
     request_calls_max: usize,
     request_timeout: Duration,
-    redis_tx: mpsc::UnboundedSender<Option<RedisMessage>>,
+    redis_tx: broadcast::Sender<RedisMessage>,
     requests_tx: mpsc::Sender<RpcRequests>,
     streams_tx: broadcast::Sender<Arc<StreamsUpdateMessage>>,
 }
@@ -78,34 +78,45 @@ impl SolanaRpc {
         request_timeout: Duration,
         request_queue_max: usize,
         streams_channel_capacity: usize,
-    ) -> (Self, impl Future<Output = anyhow::Result<()>>) {
-        let (redis_tx, redis_rx) = mpsc::unbounded_channel();
+        pool_size: usize,
+    ) -> (Self, Vec<impl Future<Output = anyhow::Result<()>>>) {
+        const REDIS_CHANNEL_SIZE: usize = 1_024;
+
+        let (redis_tx, _redis_rx) = broadcast::channel(REDIS_CHANNEL_SIZE);
         let (streams_tx, _streams_rx) = broadcast::channel(streams_channel_capacity);
         let (requests_tx, requests_rx) = mpsc::channel(request_queue_max);
+
+        let requests_rx = Arc::new(Mutex::new(requests_rx));
 
         (
             Self {
                 request_calls_max,
                 request_timeout,
-                redis_tx,
+                redis_tx: redis_tx.clone(),
                 requests_tx,
                 streams_tx: streams_tx.clone(),
             },
-            Self::run_update_loop(redis_rx, streams_tx, requests_rx),
+            std::iter::repeat(())
+                .take(pool_size)
+                .enumerate()
+                .map(move |(index, ())| {
+                    Self::run_update_loop(
+                        redis_tx.subscribe(),
+                        (index == 0).then(|| streams_tx.clone()),
+                        Arc::clone(&requests_rx),
+                    )
+                })
+                .collect(),
         )
     }
 
-    pub fn shutdown(&self) -> anyhow::Result<()> {
-        anyhow::ensure!(
-            self.redis_tx.send(None).is_ok(),
-            "SolanaRpc update loop is dead"
-        );
-        Ok(())
+    pub fn shutdown(self) {
+        drop(self.redis_tx)
     }
 
     pub fn push_redis_message(&self, message: RedisMessage) -> anyhow::Result<()> {
         anyhow::ensure!(
-            self.redis_tx.send(Some(message)).is_ok(),
+            self.redis_tx.send(message).is_ok(),
             "SolanaRpc update loop is dead"
         );
         Ok(())
@@ -648,10 +659,14 @@ impl SolanaRpc {
         error
     }
 
+    async fn get_next_requests(rx: &Mutex<mpsc::Receiver<RpcRequests>>) -> Option<RpcRequests> {
+        rx.lock().await.recv().await
+    }
+
     async fn run_update_loop(
-        mut redis_rx: mpsc::UnboundedReceiver<Option<RedisMessage>>,
-        streams_tx: broadcast::Sender<Arc<StreamsUpdateMessage>>,
-        mut requests_rx: mpsc::Receiver<RpcRequests>,
+        mut redis_rx: broadcast::Receiver<RedisMessage>,
+        streams_tx: Option<broadcast::Sender<Arc<StreamsUpdateMessage>>>,
+        requests_rx: Arc<Mutex<mpsc::Receiver<RpcRequests>>>,
     ) -> anyhow::Result<()> {
         let mut latest_blockhash_storage = LatestBlockhashStorage::default();
         let mut slots_info = BTreeMap::<Slot, StreamsSlotInfo>::new();
@@ -665,7 +680,7 @@ impl SolanaRpc {
                 biased;
 
                 maybe_message = redis_rx.recv() => match maybe_message {
-                    Some(Some(RedisMessage::Geyser(message))) => match message {
+                    Ok(RedisMessage::Geyser(message)) => match message {
                         GeyserMessage::Status { slot, commitment } => {
                             latest_blockhash_storage.update_commitment(slot, commitment);
 
@@ -673,7 +688,9 @@ impl SolanaRpc {
                                 info.commitment = commitment;
                             }
 
-                            let _ = streams_tx.send(Arc::new(StreamsUpdateMessage::Status { slot, commitment }));
+                            if let Some(tx) = &streams_tx {
+                                let _ = tx.send(Arc::new(StreamsUpdateMessage::Status { slot, commitment }));
+                            }
 
                             metrics::set_slot(commitment, slot);
                         }
@@ -695,19 +712,22 @@ impl SolanaRpc {
                                 slots_info.pop_first();
                             }
 
-                            let _ = streams_tx.send(Arc::new(StreamsUpdateMessage::Slot { info }));
+                            if let Some(tx) = &streams_tx {
+                                let _ = tx.send(Arc::new(StreamsUpdateMessage::Slot { info }));
+                            }
                         }
                     }
-                    Some(Some(RedisMessage::Epoch { epoch, leader_schedule, leader_schedule_rpc })) => {
+                    Ok(RedisMessage::Epoch { epoch, leader_schedule, leader_schedule_rpc }) => {
                         info!(epoch, "epoch received");
                         leader_schedule_map.insert(epoch, leader_schedule);
                         leader_schedule_rpc_map.insert(epoch, leader_schedule_rpc);
                         continue;
                     }
-                    _ => break,
+                    Err(broadcast::error::RecvError::Closed) => break,
+                    Err(broadcast::error::RecvError::Lagged(_lag)) => anyhow::bail!("run_update_loop lagged"),
                 },
 
-                maybe_rpc_requests = requests_rx.recv() => match maybe_rpc_requests {
+                maybe_rpc_requests = Self::get_next_requests(&requests_rx) => match maybe_rpc_requests {
                     Some(rpc_requests) => {
                         if rpc_requests.shutdown.load(Ordering::Relaxed) {
                             continue;
@@ -1010,7 +1030,7 @@ impl StreamsSlotInfo {
         hash: Hash,
         time: UnixTimestamp,
         height: Slot,
-        transactions: Vec<GeyserTransaction>,
+        transactions: Arc<Vec<GeyserTransaction>>,
     ) -> Self {
         let total_transactions_vote = transactions.iter().filter(|tx| tx.vote).count();
 
@@ -1030,7 +1050,7 @@ impl StreamsSlotInfo {
             hash,
             time,
             height,
-            transactions: Arc::new(transactions),
+            transactions,
             total_transactions_vote,
             fees,
             total_fee,
