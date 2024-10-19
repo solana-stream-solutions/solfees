@@ -2,7 +2,7 @@ use {
     crate::{
         config::ConfigRedisConsumer,
         grpc_geyser::{CommitmentLevel, GeyserMessage},
-        schedule::{LeaderScheduleRpc, LeadersSchedule},
+        schedule::{LeaderScheduleRpc, LeadersSchedule, LeadersScheduleSolfees},
     },
     anyhow::Context,
     lru::LruCache,
@@ -17,7 +17,7 @@ pub enum RedisMessage {
     Geyser(GeyserMessage),
     Epoch {
         epoch: Epoch,
-        leader_schedule: Arc<LeadersSchedule>,
+        leader_schedule_solfees: Arc<LeadersScheduleSolfees>,
         leader_schedule_rpc: Arc<LeaderScheduleRpc>,
     },
 }
@@ -31,7 +31,7 @@ impl RedisMessage {
 
         Ok(Self::Epoch {
             epoch,
-            leader_schedule: Arc::new(leader_schedule),
+            leader_schedule_solfees: Arc::new(leader_schedule.into()),
             leader_schedule_rpc: Arc::new(leader_schedule_rpc),
         })
     }

@@ -101,6 +101,7 @@ impl SolanaRpc {
                 .enumerate()
                 .map(move |(index, ())| {
                     Self::run_update_loop(
+                        index,
                         redis_tx.subscribe(),
                         (index == 0).then(|| streams_tx.clone()),
                         Arc::clone(&requests_rx),
@@ -664,6 +665,7 @@ impl SolanaRpc {
     }
 
     async fn run_update_loop(
+        index: usize,
         mut redis_rx: broadcast::Receiver<RedisMessage>,
         streams_tx: Option<broadcast::Sender<Arc<StreamsUpdateMessage>>>,
         requests_rx: Arc<Mutex<mpsc::Receiver<RpcRequests>>>,
@@ -672,8 +674,8 @@ impl SolanaRpc {
         let mut slots_info = BTreeMap::<Slot, StreamsSlotInfo>::new();
 
         let epoch_schedule = EpochSchedule::custom(432_000, 432_000, false);
-        let mut leader_schedule_map = HashMap::new();
-        let mut leader_schedule_rpc_map = HashMap::new();
+        let mut leader_schedule_map_solfees = HashMap::new();
+        let mut leader_schedule_map_rpc = HashMap::new();
 
         loop {
             tokio::select! {
@@ -717,14 +719,14 @@ impl SolanaRpc {
                             }
                         }
                     }
-                    Ok(RedisMessage::Epoch { epoch, leader_schedule, leader_schedule_rpc }) => {
-                        info!(epoch, "epoch received");
-                        leader_schedule_map.insert(epoch, leader_schedule);
-                        leader_schedule_rpc_map.insert(epoch, leader_schedule_rpc);
+                    Ok(RedisMessage::Epoch { epoch, leader_schedule_solfees, leader_schedule_rpc }) => {
+                        info!(index, epoch, "epoch received");
+                        leader_schedule_map_solfees.insert(epoch, leader_schedule_solfees);
+                        leader_schedule_map_rpc.insert(epoch, leader_schedule_rpc);
                         continue;
                     }
                     Err(broadcast::error::RecvError::Closed) => break,
-                    Err(broadcast::error::RecvError::Lagged(_lag)) => anyhow::bail!("run_update_loop lagged"),
+                    Err(broadcast::error::RecvError::Lagged(_lag)) => anyhow::bail!("run_update_loop#{index} lagged"),
                 },
 
                 maybe_rpc_requests = Self::get_next_requests(&requests_rx) => match maybe_rpc_requests {
@@ -790,7 +792,7 @@ impl SolanaRpc {
                                     }
                                     RpcRequest::LeaderSchedule { jsonrpc, id, slot, epoch, commitment, identity } => {
                                         if let Some(epoch) = epoch {
-                                            Self::create_success(jsonrpc, id, leader_schedule_map.get(&epoch))
+                                            Self::create_success(jsonrpc, id, leader_schedule_map_solfees.get(&epoch))
                                         } else {
                                             let slot = slot.unwrap_or({
                                                 match commitment {
@@ -803,12 +805,12 @@ impl SolanaRpc {
 
                                             if let Some(identity) = identity {
                                                 let mut map = HashMap::new();
-                                                if let Some(slots) = leader_schedule_rpc_map.get(&epoch).and_then(|m| m.get(&identity)) {
+                                                if let Some(slots) = leader_schedule_map_rpc.get(&epoch).and_then(|m| m.get(&identity)) {
                                                     map.insert(identity, slots);
                                                 }
                                                 Self::create_success(jsonrpc, id, Some(&map))
                                             } else {
-                                                Self::create_success(jsonrpc, id, leader_schedule_rpc_map.get(&epoch))
+                                                Self::create_success(jsonrpc, id, leader_schedule_map_rpc.get(&epoch))
                                             }
                                         }
                                     }
