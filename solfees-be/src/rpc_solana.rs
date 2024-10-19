@@ -101,6 +101,7 @@ impl SolanaRpc {
                 .enumerate()
                 .map(move |(index, ())| {
                     Self::run_update_loop(
+                        index,
                         redis_tx.subscribe(),
                         (index == 0).then(|| streams_tx.clone()),
                         Arc::clone(&requests_rx),
@@ -664,6 +665,7 @@ impl SolanaRpc {
     }
 
     async fn run_update_loop(
+        index: usize,
         mut redis_rx: broadcast::Receiver<RedisMessage>,
         streams_tx: Option<broadcast::Sender<Arc<StreamsUpdateMessage>>>,
         requests_rx: Arc<Mutex<mpsc::Receiver<RpcRequests>>>,
@@ -718,13 +720,13 @@ impl SolanaRpc {
                         }
                     }
                     Ok(RedisMessage::Epoch { epoch, leader_schedule_solfees, leader_schedule_rpc }) => {
-                        info!(epoch, "epoch received");
+                        info!(index, epoch, "epoch received");
                         leader_schedule_map_solfees.insert(epoch, leader_schedule_solfees);
                         leader_schedule_map_rpc.insert(epoch, leader_schedule_rpc);
                         continue;
                     }
                     Err(broadcast::error::RecvError::Closed) => break,
-                    Err(broadcast::error::RecvError::Lagged(_lag)) => anyhow::bail!("run_update_loop lagged"),
+                    Err(broadcast::error::RecvError::Lagged(_lag)) => anyhow::bail!("run_update_loop#{index} lagged"),
                 },
 
                 maybe_rpc_requests = Self::get_next_requests(&requests_rx) => match maybe_rpc_requests {
