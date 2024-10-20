@@ -18,5 +18,6 @@ The minor version will be incremented upon a breaking change and the patch versi
 - rpc: run multiple handlers ([#2](https://github.com/solana-stream-solutions/solfees/pull/2))
 - api: fix getLeaderSchedule for frontend ([#3](https://github.com/solana-stream-solutions/solfees/pull/3))
 - rust: bump to 1.82.0 ([#4](https://github.com/solana-stream-solutions/solfees/pull/4))
+- api: use separate thread for WebSocket ([#5](https://github.com/solana-stream-solutions/solfees/pull/5))
 
 ### Breaking
