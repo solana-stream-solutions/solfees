@@ -5,7 +5,7 @@ use {
         redis::RedisMessage,
     },
     futures::{
-        future::{pending, FutureExt},
+        future::{pending, BoxFuture, FutureExt},
         sink::SinkExt,
         stream::StreamExt,
     },
@@ -35,7 +35,6 @@ use {
     std::{
         borrow::Cow,
         collections::{BTreeMap, HashMap},
-        future::Future,
         sync::{
             atomic::{AtomicBool, Ordering},
             Arc,
@@ -79,7 +78,7 @@ impl SolanaRpc {
         request_queue_max: usize,
         streams_channel_capacity: usize,
         pool_size: usize,
-    ) -> (Self, Vec<impl Future<Output = anyhow::Result<()>>>) {
+    ) -> (Self, Vec<BoxFuture<'static, anyhow::Result<()>>>) {
         const REDIS_CHANNEL_SIZE: usize = 1_024;
 
         let (redis_tx, _redis_rx) = broadcast::channel(REDIS_CHANNEL_SIZE);
@@ -88,27 +87,28 @@ impl SolanaRpc {
 
         let requests_rx = Arc::new(Mutex::new(requests_rx));
 
-        (
-            Self {
-                request_calls_max,
-                request_timeout,
-                redis_tx: redis_tx.clone(),
-                requests_tx,
-                streams_tx: streams_tx.clone(),
-            },
-            std::iter::repeat(())
-                .take(pool_size)
-                .enumerate()
-                .map(move |(index, ())| {
-                    Self::run_update_loop(
-                        index,
-                        redis_tx.subscribe(),
-                        (index == 0).then(|| streams_tx.clone()),
-                        Arc::clone(&requests_rx),
-                    )
-                })
-                .collect(),
-        )
+        let rpc = Self {
+            request_calls_max,
+            request_timeout,
+            redis_tx: redis_tx.clone(),
+            requests_tx,
+            streams_tx: streams_tx.clone(),
+        };
+
+        let mut futs =
+            vec![Self::run_subscribe_update_loop(redis_tx.subscribe(), streams_tx).boxed()];
+        for (index, ()) in std::iter::repeat(()).take(pool_size).enumerate() {
+            futs.push(
+                Self::run_request_update_loop(
+                    index,
+                    redis_tx.subscribe(),
+                    Arc::clone(&requests_rx),
+                )
+                .boxed(),
+            );
+        }
+
+        (rpc, futs)
     }
 
     pub fn shutdown(self) {
@@ -664,10 +664,45 @@ impl SolanaRpc {
         rx.lock().await.recv().await
     }
 
-    async fn run_update_loop(
+    async fn run_subscribe_update_loop(
+        mut redis_rx: broadcast::Receiver<RedisMessage>,
+        streams_tx: broadcast::Sender<Arc<StreamsUpdateMessage>>,
+    ) -> anyhow::Result<()> {
+        loop {
+            match redis_rx.recv().await {
+                Ok(RedisMessage::Geyser(message)) => match message {
+                    GeyserMessage::Status { slot, commitment } => {
+                        let _ = streams_tx
+                            .send(Arc::new(StreamsUpdateMessage::Status { slot, commitment }));
+                        metrics::set_slot(commitment, slot);
+                    }
+                    GeyserMessage::Slot {
+                        leader,
+                        slot,
+                        hash,
+                        time,
+                        height,
+                        parent_slot: _parent_slot,
+                        parent_hash: _parent_hash,
+                        transactions,
+                    } => {
+                        let info =
+                            StreamsSlotInfo::new(leader, slot, hash, time, height, transactions);
+                        let _ = streams_tx.send(Arc::new(StreamsUpdateMessage::Slot { info }));
+                    }
+                },
+                Ok(RedisMessage::Epoch { .. }) => continue,
+                Err(broadcast::error::RecvError::Closed) => return Ok(()),
+                Err(broadcast::error::RecvError::Lagged(_lag)) => {
+                    anyhow::bail!("run_subscribe_update_loop lagged")
+                }
+            }
+        }
+    }
+
+    async fn run_request_update_loop(
         index: usize,
         mut redis_rx: broadcast::Receiver<RedisMessage>,
-        streams_tx: Option<broadcast::Sender<Arc<StreamsUpdateMessage>>>,
         requests_rx: Arc<Mutex<mpsc::Receiver<RpcRequests>>>,
     ) -> anyhow::Result<()> {
         let mut latest_blockhash_storage = LatestBlockhashStorage::default();
@@ -689,12 +724,6 @@ impl SolanaRpc {
                             if let Some(info) = slots_info.get_mut(&slot) {
                                 info.commitment = commitment;
                             }
-
-                            if let Some(tx) = &streams_tx {
-                                let _ = tx.send(Arc::new(StreamsUpdateMessage::Status { slot, commitment }));
-                            }
-
-                            metrics::set_slot(commitment, slot);
                         }
                         GeyserMessage::Slot {
                             leader,
@@ -713,10 +742,6 @@ impl SolanaRpc {
                             while slots_info.len() > MAX_NUM_RECENT_SLOT_INFO {
                                 slots_info.pop_first();
                             }
-
-                            if let Some(tx) = &streams_tx {
-                                let _ = tx.send(Arc::new(StreamsUpdateMessage::Slot { info }));
-                            }
                         }
                     }
                     Ok(RedisMessage::Epoch { epoch, leader_schedule_solfees, leader_schedule_rpc }) => {
@@ -726,7 +751,7 @@ impl SolanaRpc {
                         continue;
                     }
                     Err(broadcast::error::RecvError::Closed) => break,
-                    Err(broadcast::error::RecvError::Lagged(_lag)) => anyhow::bail!("run_update_loop#{index} lagged"),
+                    Err(broadcast::error::RecvError::Lagged(_lag)) => anyhow::bail!("run_request_update_loop#{index} lagged"),
                 },
 
                 maybe_rpc_requests = Self::get_next_requests(&requests_rx) => match maybe_rpc_requests {
