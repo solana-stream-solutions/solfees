@@ -25,7 +25,7 @@ use {
         TransactionStatusMeta, TransactionWithStatusMeta, VersionedTransactionWithStatusMeta,
     },
     std::{
-        collections::{BTreeMap, HashMap, HashSet},
+        collections::{btree_map, BTreeMap, HashMap, HashSet},
         sync::Arc,
     },
     tokio::sync::mpsc,
@@ -34,10 +34,11 @@ use {
         metadata::{errors::InvalidMetadataValue, AsciiMetadataValue},
         transport::channel::ClientTlsConfig,
     },
+    tracing::warn,
     yellowstone_grpc_client::GeyserGrpcClient,
     yellowstone_grpc_proto::prelude::{
         self as proto, subscribe_update::UpdateOneof, SubscribeRequest,
-        SubscribeRequestFilterBlocksMeta, SubscribeRequestFilterSlots,
+        SubscribeRequestFilterBlocksMeta, SubscribeRequestFilterEntry, SubscribeRequestFilterSlots,
         SubscribeRequestFilterTransactions, SubscribeUpdateBlockMeta,
     },
 };
@@ -300,6 +301,31 @@ impl GeyserMessage {
     }
 }
 
+#[derive(Debug)]
+struct BlockInfo {
+    meta: Option<SubscribeUpdateBlockMeta>,
+    transactions: Vec<GeyserTransaction>,
+    transactions_finished: bool,
+    entries_executed_transaction_count: u64,
+}
+
+impl Default for BlockInfo {
+    fn default() -> Self {
+        Self {
+            meta: None,
+            transactions: Vec::with_capacity(8192),
+            transactions_finished: true,
+            entries_executed_transaction_count: 0,
+        }
+    }
+}
+
+#[derive(Debug)]
+enum MaybeGeyserMessage {
+    Geyser(GeyserMessage),
+    Block(Slot),
+}
+
 pub async fn subscribe<T>(
     grpc_endpoint: String,
     grpc_x_token: Option<T>,
@@ -332,7 +358,7 @@ where
                 account_required: vec![],
             } },
             transactions_status: HashMap::new(),
-            entry: HashMap::new(),
+            entry: hashmap! { "".to_owned() => SubscribeRequestFilterEntry {} },
             blocks: HashMap::new(),
             blocks_meta: hashmap! { "".to_owned() => SubscribeRequestFilterBlocksMeta {} },
             commitment: Some(proto::CommitmentLevel::Processed as i32),
@@ -345,7 +371,8 @@ where
     let (tx, rx) = mpsc::unbounded_channel();
     let (schedule, schedule_rx) = SolanaSchedule::new(rpc_endpoint, saved_epochs);
     tokio::spawn(async move {
-        let mut transactions: BTreeMap<Slot, Vec<GeyserTransaction>> = Default::default();
+        let mut blocks = BTreeMap::<Slot, BlockInfo>::new();
+        let mut latest_slot_tx = 0;
 
         let mut alive = true;
         while alive {
@@ -356,55 +383,111 @@ where
                             let commitment = CommitmentLevel::from(commitment);
                             if commitment == CommitmentLevel::Finalized {
                                 loop {
-                                    match transactions.first_key_value() {
-                                        Some((first_slot, _map)) if *first_slot < info.slot => {
-                                            transactions.pop_first();
+                                    match blocks.first_key_value() {
+                                        Some((first_slot, block_info))
+                                            if *first_slot < info.slot =>
+                                        {
+                                            warn!(
+                                                slot = first_slot,
+                                                meta = block_info.meta.is_some(),
+                                                transactions_finished =
+                                                    block_info.transactions_finished,
+                                                transactions = block_info.transactions.len(),
+                                                "block never builded"
+                                            );
+                                            blocks.pop_first();
                                         }
                                         _ => break,
                                     }
                                 }
                             }
 
-                            GeyserMessage::Status {
+                            MaybeGeyserMessage::Geyser(GeyserMessage::Status {
                                 slot: info.slot,
                                 commitment,
-                            }
+                            })
                         })
                         .map_err(|_error| anyhow::anyhow!("invalid commitment"))
                 }
-                Some(Ok(Some(UpdateOneof::Transaction(info)))) => {
-                    Err(anyhow::anyhow!(match info.transaction.map(|tx| (
+                Some(Ok(Some(UpdateOneof::Transaction(info)))) => match info.transaction.map(|tx| {
+                    (
                         tx.is_vote,
                         yellowstone_grpc_proto::convert_from::create_tx_with_meta(tx),
-                    )) {
-                        Some((is_vote, Ok(TransactionWithStatusMeta::Complete(tx_with_meta)))) => {
-                            transactions
-                                .entry(info.slot)
-                                .or_insert_with(|| Vec::with_capacity(4096))
-                                .push(GeyserTransaction::from((tx_with_meta, is_vote)));
+                    )
+                }) {
+                    Some((is_vote, Ok(TransactionWithStatusMeta::Complete(tx_with_meta)))) => {
+                        let entry = blocks.entry(info.slot).or_default();
+                        entry
+                            .transactions
+                            .push(GeyserTransaction::from((tx_with_meta, is_vote)));
+                        if latest_slot_tx != info.slot {
+                            latest_slot_tx = info.slot;
+                            entry.transactions_finished = true;
+                            Ok(MaybeGeyserMessage::Block(info.slot))
+                        } else {
                             continue;
                         }
-                        Some((_is_vote, Ok(TransactionWithStatusMeta::MissingMetadata(_)))) => {
-                            "failed to get transaction metadata".to_owned()
-                        }
-                        Some((_is_vote, Err(error))) =>
-                            format!("failed to decode transaction: {error}"),
-                        None => "failed to get transaction".to_owned(),
-                    }))
-                }
-                Some(Ok(Some(UpdateOneof::BlockMeta(info)))) => {
-                    if let Some(transactions) = transactions.remove(&info.slot) {
-                        let leader = schedule.get_leader(info.slot);
-                        GeyserMessage::build_block(leader, info, transactions)
-                    } else {
-                        continue;
                     }
+                    Some((_is_vote, Ok(TransactionWithStatusMeta::MissingMetadata(_)))) => {
+                        Err("failed to get transaction metadata".to_owned())
+                    }
+                    Some((_is_vote, Err(error))) => {
+                        Err(format!("failed to decode transaction: {error}"))
+                    }
+                    None => Err("failed to get transaction".to_owned()),
+                }
+                .map_err(|err| anyhow::anyhow!(err)),
+                Some(Ok(Some(UpdateOneof::BlockMeta(info)))) => {
+                    let slot = info.slot;
+                    blocks.entry(slot).or_default().meta = Some(info);
+                    Ok(MaybeGeyserMessage::Block(slot))
+                }
+                Some(Ok(Some(UpdateOneof::Entry(info)))) => {
+                    blocks
+                        .entry(info.slot)
+                        .or_default()
+                        .entries_executed_transaction_count += info.executed_transaction_count;
+                    continue;
                 }
                 Some(Ok(_)) => {
                     continue;
                 }
                 Some(Err(error)) => Err(error.into()),
                 None => Err(anyhow::anyhow!("stream finished")),
+            };
+
+            let msg = match msg {
+                Ok(MaybeGeyserMessage::Geyser(msg)) => Ok(msg),
+                Ok(MaybeGeyserMessage::Block(slot)) => {
+                    if let btree_map::Entry::Occupied(entry) = blocks.entry(slot) {
+                        let info = entry.get();
+                        if info.meta.is_some() && info.transactions_finished {
+                            let info = entry.remove();
+                            let meta = info.meta.expect("already checked");
+                            if meta.executed_transaction_count != info.transactions.len() as u64
+                                || meta.executed_transaction_count
+                                    != info.entries_executed_transaction_count
+                            {
+                                warn!(
+                                    slot,
+                                    block_executed_transaction_count =
+                                        meta.executed_transaction_count,
+                                    entries_executed_transaction_count =
+                                        info.entries_executed_transaction_count,
+                                    transactions = info.transactions.len(),
+                                    "number of transactions mismatch"
+                                );
+                            }
+                            let leader = schedule.get_leader(slot);
+                            GeyserMessage::build_block(leader, meta, info.transactions)
+                        } else {
+                            continue;
+                        }
+                    } else {
+                        continue;
+                    }
+                }
+                Err(error) => Err(error),
             };
 
             alive = msg.is_ok();
