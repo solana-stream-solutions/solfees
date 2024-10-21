@@ -305,7 +305,6 @@ impl GeyserMessage {
 struct BlockInfo {
     meta: Option<SubscribeUpdateBlockMeta>,
     transactions: Vec<GeyserTransaction>,
-    transactions_finished: bool,
     entries_executed_transaction_count: u64,
 }
 
@@ -314,7 +313,6 @@ impl Default for BlockInfo {
         Self {
             meta: None,
             transactions: Vec::with_capacity(8192),
-            transactions_finished: true,
             entries_executed_transaction_count: 0,
         }
     }
@@ -372,7 +370,6 @@ where
     let (schedule, schedule_rx) = SolanaSchedule::new(rpc_endpoint, saved_epochs);
     tokio::spawn(async move {
         let mut blocks = BTreeMap::<Slot, BlockInfo>::new();
-        let mut latest_slot_tx = 0;
 
         let mut alive = true;
         while alive {
@@ -390,8 +387,13 @@ where
                                             warn!(
                                                 slot = first_slot,
                                                 meta = block_info.meta.is_some(),
-                                                transactions_finished =
-                                                    block_info.transactions_finished,
+                                                block_executed_transaction_count = block_info
+                                                    .meta
+                                                    .as_ref()
+                                                    .map(|m| m.executed_transaction_count)
+                                                    .unwrap_or_default(),
+                                                entries_executed_transaction_count =
+                                                    block_info.entries_executed_transaction_count,
                                                 transactions = block_info.transactions.len(),
                                                 "block never builded"
                                             );
@@ -416,17 +418,12 @@ where
                     )
                 }) {
                     Some((is_vote, Ok(TransactionWithStatusMeta::Complete(tx_with_meta)))) => {
-                        let entry = blocks.entry(info.slot).or_default();
-                        entry
+                        blocks
+                            .entry(info.slot)
+                            .or_default()
                             .transactions
                             .push(GeyserTransaction::from((tx_with_meta, is_vote)));
-                        if latest_slot_tx != info.slot {
-                            latest_slot_tx = info.slot;
-                            entry.transactions_finished = true;
-                            Ok(MaybeGeyserMessage::Block(info.slot))
-                        } else {
-                            continue;
-                        }
+                        Ok(MaybeGeyserMessage::Block(info.slot))
                     }
                     Some((_is_vote, Ok(TransactionWithStatusMeta::MissingMetadata(_)))) => {
                         Err("failed to get transaction metadata".to_owned())
@@ -461,23 +458,11 @@ where
                 Ok(MaybeGeyserMessage::Block(slot)) => {
                     if let btree_map::Entry::Occupied(entry) = blocks.entry(slot) {
                         let info = entry.get();
-                        if info.meta.is_some() && info.transactions_finished {
+                        if info.meta.as_ref().map(|m| m.executed_transaction_count)
+                            == Some(info.transactions.len() as u64)
+                        {
                             let info = entry.remove();
                             let meta = info.meta.expect("already checked");
-                            if meta.executed_transaction_count != info.transactions.len() as u64
-                                || meta.executed_transaction_count
-                                    != info.entries_executed_transaction_count
-                            {
-                                warn!(
-                                    slot,
-                                    block_executed_transaction_count =
-                                        meta.executed_transaction_count,
-                                    entries_executed_transaction_count =
-                                        info.entries_executed_transaction_count,
-                                    transactions = info.transactions.len(),
-                                    "number of transactions mismatch"
-                                );
-                            }
                             let leader = schedule.get_leader(slot);
                             GeyserMessage::build_block(leader, meta, info.transactions)
                         } else {
