@@ -22,6 +22,9 @@ concurrency:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: 'solfees-fe'
     steps:
       - uses: actions/checkout@v4
       - name: Install pnpm
@@ -36,10 +39,8 @@ jobs:
           cache-dependency-path: "solfees-fe"
       - name: Install node_modules
         run: pnpm install
-        working-directory: solfees-fe
       - name: Build application
         run: pnpm build
-        working-directory: solfees-fe
       - name: Deploy 🚀
         uses: JamesIves/github-pages-deploy-action@v4
         with:
