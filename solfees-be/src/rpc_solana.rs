@@ -26,7 +26,7 @@ use {
         },
     },
     solana_sdk::{
-        clock::{Epoch, Slot, UnixTimestamp, MAX_RECENT_BLOCKHASHES},
+        clock::{Epoch, Slot, UnixTimestamp, MAX_PROCESSING_AGE},
         epoch_schedule::EpochSchedule,
         hash::Hash,
         pubkey::Pubkey,
@@ -766,8 +766,9 @@ impl SolanaRpc {
                             .map(|request| {
                                 match request {
                                     RpcRequest::LatestBlockhash { jsonrpc, id, commitment, rollback, min_context_slot } => {
-                                        if rollback > MAX_RECENT_BLOCKHASHES {
-                                            return Self::create_failure(jsonrpc, id, JsonrpcError::invalid_params("rollback exceeds 300"));
+                                        if rollback > MAX_PROCESSING_AGE {
+                                            let error = JsonrpcError::invalid_params(format!("rollback exceeds {MAX_PROCESSING_AGE}"));
+                                            return Self::create_failure(jsonrpc, id, error);
                                         }
 
                                         let mut slot = match commitment {
@@ -811,7 +812,7 @@ impl SolanaRpc {
                                             context: RpcResponseContext::new(slot),
                                             value: RpcBlockhash {
                                                 blockhash: value.hash.to_string(),
-                                                last_valid_block_height: value.height + MAX_RECENT_BLOCKHASHES as u64,
+                                                last_valid_block_height: value.height + MAX_PROCESSING_AGE as u64,
                                             },
                                         })
                                     }
@@ -1018,7 +1019,7 @@ impl LatestBlockhashStorage {
             }
         }
 
-        while self.finalized_total > MAX_RECENT_BLOCKHASHES + 10 {
+        while self.finalized_total > MAX_PROCESSING_AGE + 10 {
             if let Some((_slot, value)) = self.slots.pop_first() {
                 if value.commitment == CommitmentLevel::Finalized {
                     self.finalized_total -= 1;
