@@ -33,7 +33,7 @@ jobs:
         with:
           node-version: 22
           cache: 'pnpm'
-          working-directory: solfees-fe
+          cache-dependency-path: "solfees-fe"
       - name: Install node_modules
         run: pnpm install
         working-directory: solfees-fe
