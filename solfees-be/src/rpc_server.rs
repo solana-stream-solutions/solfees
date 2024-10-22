@@ -128,11 +128,14 @@ pub async fn run_solfees(
                                 })
                                 .await
                             {
-                                Ok(body) => Response::builder()
-                                    .header(CONTENT_TYPE, "application/json; charset=utf-8")
-                                    .header(ACCESS_CONTROL_ALLOW_METHODS, "OPTIONS, POST")
-                                    .header(ACCESS_CONTROL_ALLOW_ORIGIN, "*")
-                                    .body(BodyFull::new(Bytes::from(body)).boxed()),
+                                Ok((stats, body)) => {
+                                    metrics_be::requests_call_inc(solana_rpc_mode, stats);
+                                    Response::builder()
+                                        .header(CONTENT_TYPE, "application/json; charset=utf-8")
+                                        .header(ACCESS_CONTROL_ALLOW_METHODS, "OPTIONS, POST")
+                                        .header(ACCESS_CONTROL_ALLOW_ORIGIN, "*")
+                                        .body(BodyFull::new(Bytes::from(body)).boxed())
+                                }
                                 Err(error) => Response::builder()
                                     .status(StatusCode::INTERNAL_SERVER_ERROR)
                                     .body(BodyFull::new(Bytes::from(format!("{error}"))).boxed()),

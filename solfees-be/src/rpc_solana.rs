@@ -62,6 +62,17 @@ pub enum SolanaRpcMode {
     SolfeesFrontend,
 }
 
+impl SolanaRpcMode {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Solana => "solana",
+            Self::Triton => "triton",
+            Self::Solfees => "solfees",
+            Self::SolfeesFrontend => "frontend",
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct SolanaRpc {
     request_calls_max: usize,
@@ -128,7 +139,9 @@ impl SolanaRpc {
         mode: SolanaRpcMode,
         body: impl Buf,
         mut shutdown_rx: broadcast::Receiver<()>,
-    ) -> anyhow::Result<Vec<u8>> {
+    ) -> anyhow::Result<(RpcRequestsStats, Vec<u8>)> {
+        let mut stats = RpcRequestsStats::default();
+
         #[derive(Debug, Deserialize)]
         #[serde(untagged)]
         enum JsonrpcCalls {
@@ -172,7 +185,7 @@ impl SolanaRpc {
 
             match call.method.as_str() {
                 "getLatestBlockhash" if mode != SolanaRpcMode::SolfeesFrontend => {
-                    metrics::requests_call_inc(mode, RpcRequestType::LatestBlockhash);
+                    stats.latest_blockhash += 1;
 
                     let parsed_params = match mode {
                         SolanaRpcMode::Solana => {
@@ -221,7 +234,7 @@ impl SolanaRpc {
                     });
                 }
                 "getLeaderSchedule" => {
-                    metrics::requests_call_inc(mode, RpcRequestType::LeaderSchedule);
+                    stats.leader_schedule += 1;
 
                     let maybe_request = match mode {
                         SolanaRpcMode::Solana | SolanaRpcMode::Triton | SolanaRpcMode::Solfees => {
@@ -293,7 +306,7 @@ impl SolanaRpc {
                     });
                 }
                 "getRecentPrioritizationFees" => {
-                    metrics::requests_call_inc(mode, RpcRequestType::RecentPrioritizationFees);
+                    stats.recent_prioritization_fees += 1;
 
                     let maybe_parsed_params = match mode {
                         SolanaRpcMode::Solana => {
@@ -382,7 +395,7 @@ impl SolanaRpc {
                     }
                 }
                 "getSlot" if mode != SolanaRpcMode::SolfeesFrontend => {
-                    metrics::requests_call_inc(mode, RpcRequestType::Slot);
+                    stats.slot += 1;
 
                     #[derive(Debug, Deserialize)]
                     struct ReqParams {
@@ -412,7 +425,7 @@ impl SolanaRpc {
                     )
                 }
                 "getVersion" if mode != SolanaRpcMode::SolfeesFrontend => {
-                    metrics::requests_call_inc(mode, RpcRequestType::Version);
+                    stats.version += 1;
 
                     outputs.push(Some(if let Err(error) = call.params.expect_no_params() {
                         Self::create_failure(call.jsonrpc, call.id, error)
@@ -504,7 +517,7 @@ impl SolanaRpc {
         }
         .map(|mut body| {
             body.push(b'\n');
-            body
+            (stats, body)
         })
     }
 
@@ -934,20 +947,20 @@ fn verify_pubkey(input: &str) -> Result<Pubkey, JsonrpcError> {
         .map_err(|e| JsonrpcError::invalid_params(format!("Invalid param: {e:?}")))
 }
 
+#[derive(Debug, Default, Clone, Copy)]
+pub struct RpcRequestsStats {
+    pub latest_blockhash: u64,
+    pub leader_schedule: u64,
+    pub recent_prioritization_fees: u64,
+    pub slot: u64,
+    pub version: u64,
+}
+
 #[derive(Debug)]
 struct RpcRequests {
     requests: Vec<RpcRequest>,
     shutdown: Arc<AtomicBool>,
     response_tx: oneshot::Sender<Vec<JsonrpcOutput>>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RpcRequestType {
-    LatestBlockhash,
-    LeaderSchedule,
-    RecentPrioritizationFees,
-    Slot,
-    Version,
 }
 
 #[derive(Debug)]

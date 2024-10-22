@@ -89,7 +89,7 @@ pub mod solfees_be {
         super::{init2, REGISTRY},
         crate::{
             grpc_geyser::CommitmentLevel,
-            rpc_solana::{RpcRequestType, SolanaRpcMode},
+            rpc_solana::{RpcRequestsStats, SolanaRpcMode},
         },
         http::StatusCode,
         prometheus::{HistogramOpts, HistogramVec, IntCounterVec, IntGauge, IntGaugeVec, Opts},
@@ -97,17 +97,12 @@ pub mod solfees_be {
         std::{borrow::Cow, time::Duration},
     };
 
-    // TODO: replace with std
     lazy_static::lazy_static! {
         static ref LATEST_SLOT: IntGaugeVec = IntGaugeVec::new(
             Opts::new("latest_slot", "Latest slot received from Redis by commitment"),
             &["commitment"]
         ).unwrap();
 
-        // TOOD: name
-        // # HELP requests_duration_seconds Elapsed time per request
-        // # TYPE requests_duration_seconds histogram
-        // requests_duration_seconds_bucket{api="frontend",status="200",le="0.005"} 0
         static ref REQUESTS_DURATION_SECONDS: HistogramVec = HistogramVec::new(
             HistogramOpts {
                 common_opts: Opts::new("requests_duration_seconds", "Elapsed time per request"),
@@ -155,12 +150,7 @@ pub mod solfees_be {
 
         REQUESTS_DURATION_SECONDS
             .with_label_values(&[
-                match api {
-                    SolanaRpcMode::Solana => "solana",
-                    SolanaRpcMode::Triton => "triton",
-                    SolanaRpcMode::Solfees => "solfees",
-                    SolanaRpcMode::SolfeesFrontend => "frontend",
-                },
+                api.as_str(),
                 match status.map(|s| s.as_u16()) {
                     Some(200) => Cow::Borrowed("200"),
                     Some(500) => Cow::Borrowed("500"),
@@ -172,24 +162,22 @@ pub mod solfees_be {
             .observe(sec);
     }
 
-    pub fn requests_call_inc(api: SolanaRpcMode, method: RpcRequestType) {
+    pub fn requests_call_inc(api: SolanaRpcMode, stats: RpcRequestsStats) {
         REQUESTS_CALLS_TOTAL
-            .with_label_values(&[
-                match api {
-                    SolanaRpcMode::Solana => "solana",
-                    SolanaRpcMode::Triton => "triton",
-                    SolanaRpcMode::Solfees => "solfees",
-                    SolanaRpcMode::SolfeesFrontend => "frontend",
-                },
-                match method {
-                    RpcRequestType::LatestBlockhash => "get_latest_blockhash",
-                    RpcRequestType::LeaderSchedule => "get_leader_schedule",
-                    RpcRequestType::RecentPrioritizationFees => "get_recent_prioritization_fees",
-                    RpcRequestType::Slot => "get_slot",
-                    RpcRequestType::Version => "get_version",
-                },
-            ])
-            .inc()
+            .with_label_values(&[api.as_str(), "get_latest_blockhash"])
+            .inc_by(stats.latest_blockhash);
+        REQUESTS_CALLS_TOTAL
+            .with_label_values(&[api.as_str(), "get_leader_schedule"])
+            .inc_by(stats.latest_blockhash);
+        REQUESTS_CALLS_TOTAL
+            .with_label_values(&[api.as_str(), "get_recent_prioritization_fees"])
+            .inc_by(stats.latest_blockhash);
+        REQUESTS_CALLS_TOTAL
+            .with_label_values(&[api.as_str(), "get_slot"])
+            .inc_by(stats.latest_blockhash);
+        REQUESTS_CALLS_TOTAL
+            .with_label_values(&[api.as_str(), "get_version"])
+            .inc_by(stats.latest_blockhash);
     }
 
     pub fn requests_queue_size_inc() {
