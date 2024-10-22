@@ -19,5 +19,6 @@ The minor version will be incremented upon a breaking change and the patch versi
 - api: fix getLeaderSchedule for frontend ([#3](https://github.com/solana-stream-solutions/solfees/pull/3))
 - rust: bump to 1.82.0 ([#4](https://github.com/solana-stream-solutions/solfees/pull/4))
 - api: use separate thread for WebSocket ([#5](https://github.com/solana-stream-solutions/solfees/pull/5))
+- api: fix getLatestBlockhash for rollback / lastValidBlockHeight ([#6](https://github.com/solana-stream-solutions/solfees/pull/6))
 
 ### Breaking
