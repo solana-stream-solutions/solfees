@@ -172,7 +172,7 @@ impl Default for ConfigListenRpc {
             request_calls_max: 10,
             request_timeout: Duration::from_secs(60),
             request_queue_max: 1_000,
-            streams_channel_capacity: 150,
+            streams_channel_capacity: 300,
             pool_size: 2,
         }
     }
