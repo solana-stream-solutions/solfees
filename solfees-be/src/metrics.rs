@@ -91,7 +91,7 @@ pub mod solfees_be {
             grpc_geyser::CommitmentLevel,
             rpc_solana::{RpcRequestType, SolanaRpcMode},
         },
-        prometheus::{IntCounterVec, IntGaugeVec, Opts},
+        prometheus::{IntCounterVec, IntGauge, IntGaugeVec, Opts},
         solana_sdk::clock::Slot,
     };
 
@@ -111,8 +111,12 @@ pub mod solfees_be {
             &["api", "method"]
         ).unwrap();
 
-        static ref WEBSOCKETS_TOTAL: IntGaugeVec = IntGaugeVec::new(
-            Opts::new("websockets_total", "Total number of alive WebSocket connections"),
+        static ref REQUESTS_QUEUE_SIZE: IntGauge = IntGauge::new(
+            "requests_queue_size", "Queue size by API and method"
+        ).unwrap();
+
+        static ref WEBSOCKETS_ALIVE_TOTAL: IntGaugeVec = IntGaugeVec::new(
+            Opts::new("websockets_alive_total", "Total number of alive WebSocket connections"),
             &["api"]
         ).unwrap();
     }
@@ -123,7 +127,8 @@ pub mod solfees_be {
         register!(LATEST_SLOT);
         register!(REQUESTS_TOTAL);
         register!(REQUESTS_CALLS_TOTAL);
-        register!(WEBSOCKETS_TOTAL);
+        register!(REQUESTS_QUEUE_SIZE);
+        register!(WEBSOCKETS_ALIVE_TOTAL);
     }
 
     pub fn set_slot(commitment: CommitmentLevel, slot: Slot) {
@@ -163,21 +168,29 @@ pub mod solfees_be {
             .inc()
     }
 
-    pub fn websockets_inc(api: SolanaRpcMode) {
-        let api = match api {
-            SolanaRpcMode::Solfees => "solfees",
-            SolanaRpcMode::SolfeesFrontend => "frontend",
-            _ => return,
-        };
-        WEBSOCKETS_TOTAL.with_label_values(&[api]).inc()
+    pub fn requests_queue_size_inc() {
+        REQUESTS_QUEUE_SIZE.inc();
     }
 
-    pub fn websockets_dec(api: SolanaRpcMode) {
+    pub fn requests_queue_size_dec() {
+        REQUESTS_QUEUE_SIZE.dec();
+    }
+
+    pub fn websockets_alive_inc(api: SolanaRpcMode) {
         let api = match api {
             SolanaRpcMode::Solfees => "solfees",
             SolanaRpcMode::SolfeesFrontend => "frontend",
             _ => return,
         };
-        WEBSOCKETS_TOTAL.with_label_values(&[api]).dec()
+        WEBSOCKETS_ALIVE_TOTAL.with_label_values(&[api]).inc()
+    }
+
+    pub fn websockets_alive_dec(api: SolanaRpcMode) {
+        let api = match api {
+            SolanaRpcMode::Solfees => "solfees",
+            SolanaRpcMode::SolfeesFrontend => "frontend",
+            _ => return,
+        };
+        WEBSOCKETS_ALIVE_TOTAL.with_label_values(&[api]).dec()
     }
 }

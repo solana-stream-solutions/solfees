@@ -455,6 +455,7 @@ impl SolanaRpc {
                     anyhow::bail!("processed loop is closed");
                 }
             }
+            metrics::requests_queue_size_inc();
 
             tokio::select! {
                 value = shutdown_rx.recv() => match value {
@@ -521,7 +522,7 @@ impl SolanaRpc {
                 return;
             }
         };
-        metrics::websockets_inc(mode);
+        metrics::websockets_alive_inc(mode);
 
         let mut updates_rx = self.streams_tx.subscribe();
         let mut filter = None;
@@ -629,7 +630,7 @@ impl SolanaRpc {
         }
         let _ = websocket_tx.flush().await;
 
-        metrics::websockets_dec(mode);
+        metrics::websockets_alive_dec(mode);
     }
 
     fn create_success<R>(jsonrpc: Option<JsonrpcVersion>, id: JsonrpcId, result: R) -> JsonrpcOutput
@@ -756,6 +757,8 @@ impl SolanaRpc {
 
                 maybe_rpc_requests = Self::get_next_requests(&requests_rx) => match maybe_rpc_requests {
                     Some(rpc_requests) => {
+                        metrics::requests_queue_size_dec();
+
                         if rpc_requests.shutdown.load(Ordering::Relaxed) {
                             continue;
                         }
