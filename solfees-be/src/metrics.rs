@@ -91,19 +91,31 @@ pub mod solfees_be {
             grpc_geyser::CommitmentLevel,
             rpc_solana::{RpcRequestType, SolanaRpcMode},
         },
-        prometheus::{IntCounterVec, IntGauge, IntGaugeVec, Opts},
+        http::StatusCode,
+        prometheus::{HistogramOpts, HistogramVec, IntCounterVec, IntGauge, IntGaugeVec, Opts},
         solana_sdk::clock::Slot,
+        std::{borrow::Cow, time::Duration},
     };
 
+    // TODO: replace with std
     lazy_static::lazy_static! {
         static ref LATEST_SLOT: IntGaugeVec = IntGaugeVec::new(
             Opts::new("latest_slot", "Latest slot received from Redis by commitment"),
             &["commitment"]
         ).unwrap();
 
-        static ref REQUESTS_TOTAL: IntCounterVec = IntCounterVec::new(
-            Opts::new("requests_total", "Total number of requests by API"),
-            &["api"]
+        // TOOD: name
+        // # HELP requests_duration_seconds Elapsed time per request
+        // # TYPE requests_duration_seconds histogram
+        // requests_duration_seconds_bucket{api="frontend",status="200",le="0.005"} 0
+        static ref REQUESTS_DURATION_SECONDS: HistogramVec = HistogramVec::new(
+            HistogramOpts {
+                common_opts: Opts::new("requests_duration_seconds", "Elapsed time per request"),
+                buckets: vec![
+                    0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0,
+                ]
+            },
+            &["api", "status"]
         ).unwrap();
 
         static ref REQUESTS_CALLS_TOTAL: IntCounterVec = IntCounterVec::new(
@@ -125,7 +137,7 @@ pub mod solfees_be {
         init2();
 
         register!(LATEST_SLOT);
-        register!(REQUESTS_TOTAL);
+        register!(REQUESTS_DURATION_SECONDS);
         register!(REQUESTS_CALLS_TOTAL);
         register!(REQUESTS_QUEUE_SIZE);
         register!(WEBSOCKETS_ALIVE_TOTAL);
@@ -137,15 +149,27 @@ pub mod solfees_be {
             .set(slot as i64);
     }
 
-    pub fn requests_inc(api: SolanaRpcMode) {
-        REQUESTS_TOTAL
-            .with_label_values(&[match api {
-                SolanaRpcMode::Solana => "solana",
-                SolanaRpcMode::Triton => "triton",
-                SolanaRpcMode::Solfees => "solfees",
-                SolanaRpcMode::SolfeesFrontend => "frontend",
-            }])
-            .inc()
+    pub fn requests_observe(api: SolanaRpcMode, status: Option<StatusCode>, duration: Duration) {
+        let nanos = f64::from(duration.subsec_nanos()) / 1e9;
+        let sec = duration.as_secs() as f64 + nanos;
+
+        REQUESTS_DURATION_SECONDS
+            .with_label_values(&[
+                match api {
+                    SolanaRpcMode::Solana => "solana",
+                    SolanaRpcMode::Triton => "triton",
+                    SolanaRpcMode::Solfees => "solfees",
+                    SolanaRpcMode::SolfeesFrontend => "frontend",
+                },
+                match status.map(|s| s.as_u16()) {
+                    Some(200) => Cow::Borrowed("200"),
+                    Some(500) => Cow::Borrowed("500"),
+                    Some(code) => Cow::Owned(code.to_string()),
+                    None => Cow::Borrowed("error"),
+                }
+                .as_ref(),
+            ])
+            .observe(sec);
     }
 
     pub fn requests_call_inc(api: SolanaRpcMode, method: RpcRequestType) {
