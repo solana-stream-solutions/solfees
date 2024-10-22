@@ -89,10 +89,12 @@ pub mod solfees_be {
         super::{init2, REGISTRY},
         crate::{
             grpc_geyser::CommitmentLevel,
-            rpc_solana::{RpcRequestType, SolanaRpcMode},
+            rpc_solana::{RpcRequestsStats, SolanaRpcMode},
         },
-        prometheus::{IntCounterVec, IntGaugeVec, Opts},
+        http::StatusCode,
+        prometheus::{HistogramOpts, HistogramVec, IntCounterVec, IntGauge, IntGaugeVec, Opts},
         solana_sdk::clock::Slot,
+        std::{borrow::Cow, time::Duration},
     };
 
     lazy_static::lazy_static! {
@@ -101,9 +103,14 @@ pub mod solfees_be {
             &["commitment"]
         ).unwrap();
 
-        static ref REQUESTS_TOTAL: IntCounterVec = IntCounterVec::new(
-            Opts::new("requests_total", "Total number of requests by API"),
-            &["api"]
+        static ref REQUESTS_DURATION_SECONDS: HistogramVec = HistogramVec::new(
+            HistogramOpts {
+                common_opts: Opts::new("requests_duration_seconds", "Elapsed time per request"),
+                buckets: vec![
+                    0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0,
+                ]
+            },
+            &["api", "status"]
         ).unwrap();
 
         static ref REQUESTS_CALLS_TOTAL: IntCounterVec = IntCounterVec::new(
@@ -111,8 +118,12 @@ pub mod solfees_be {
             &["api", "method"]
         ).unwrap();
 
-        static ref WEBSOCKETS_TOTAL: IntGaugeVec = IntGaugeVec::new(
-            Opts::new("websockets_total", "Total number of alive WebSocket connections"),
+        static ref REQUESTS_QUEUE_SIZE: IntGauge = IntGauge::new(
+            "requests_queue_size", "Queue size by API and method"
+        ).unwrap();
+
+        static ref WEBSOCKETS_ALIVE_TOTAL: IntGaugeVec = IntGaugeVec::new(
+            Opts::new("websockets_alive_total", "Total number of alive WebSocket connections"),
             &["api"]
         ).unwrap();
     }
@@ -121,9 +132,10 @@ pub mod solfees_be {
         init2();
 
         register!(LATEST_SLOT);
-        register!(REQUESTS_TOTAL);
+        register!(REQUESTS_DURATION_SECONDS);
         register!(REQUESTS_CALLS_TOTAL);
-        register!(WEBSOCKETS_TOTAL);
+        register!(REQUESTS_QUEUE_SIZE);
+        register!(WEBSOCKETS_ALIVE_TOTAL);
     }
 
     pub fn set_slot(commitment: CommitmentLevel, slot: Slot) {
@@ -132,52 +144,65 @@ pub mod solfees_be {
             .set(slot as i64);
     }
 
-    pub fn requests_inc(api: SolanaRpcMode) {
-        REQUESTS_TOTAL
-            .with_label_values(&[match api {
-                SolanaRpcMode::Solana => "solana",
-                SolanaRpcMode::Triton => "triton",
-                SolanaRpcMode::Solfees => "solfees",
-                SolanaRpcMode::SolfeesFrontend => "frontend",
-            }])
-            .inc()
-    }
+    pub fn requests_observe(api: SolanaRpcMode, status: Option<StatusCode>, duration: Duration) {
+        let nanos = f64::from(duration.subsec_nanos()) / 1e9;
+        let sec = duration.as_secs() as f64 + nanos;
 
-    pub fn requests_call_inc(api: SolanaRpcMode, method: RpcRequestType) {
-        REQUESTS_CALLS_TOTAL
+        REQUESTS_DURATION_SECONDS
             .with_label_values(&[
-                match api {
-                    SolanaRpcMode::Solana => "solana",
-                    SolanaRpcMode::Triton => "triton",
-                    SolanaRpcMode::Solfees => "solfees",
-                    SolanaRpcMode::SolfeesFrontend => "frontend",
-                },
-                match method {
-                    RpcRequestType::LatestBlockhash => "get_latest_blockhash",
-                    RpcRequestType::LeaderSchedule => "get_leader_schedule",
-                    RpcRequestType::RecentPrioritizationFees => "get_recent_prioritization_fees",
-                    RpcRequestType::Slot => "get_slot",
-                    RpcRequestType::Version => "get_version",
-                },
+                api.as_str(),
+                match status.map(|s| s.as_u16()) {
+                    Some(200) => Cow::Borrowed("200"),
+                    Some(500) => Cow::Borrowed("500"),
+                    Some(code) => Cow::Owned(code.to_string()),
+                    None => Cow::Borrowed("error"),
+                }
+                .as_ref(),
             ])
-            .inc()
+            .observe(sec);
     }
 
-    pub fn websockets_inc(api: SolanaRpcMode) {
+    pub fn requests_call_inc(api: SolanaRpcMode, stats: RpcRequestsStats) {
+        REQUESTS_CALLS_TOTAL
+            .with_label_values(&[api.as_str(), "get_latest_blockhash"])
+            .inc_by(stats.latest_blockhash);
+        REQUESTS_CALLS_TOTAL
+            .with_label_values(&[api.as_str(), "get_leader_schedule"])
+            .inc_by(stats.latest_blockhash);
+        REQUESTS_CALLS_TOTAL
+            .with_label_values(&[api.as_str(), "get_recent_prioritization_fees"])
+            .inc_by(stats.latest_blockhash);
+        REQUESTS_CALLS_TOTAL
+            .with_label_values(&[api.as_str(), "get_slot"])
+            .inc_by(stats.latest_blockhash);
+        REQUESTS_CALLS_TOTAL
+            .with_label_values(&[api.as_str(), "get_version"])
+            .inc_by(stats.latest_blockhash);
+    }
+
+    pub fn requests_queue_size_inc() {
+        REQUESTS_QUEUE_SIZE.inc();
+    }
+
+    pub fn requests_queue_size_dec() {
+        REQUESTS_QUEUE_SIZE.dec();
+    }
+
+    pub fn websockets_alive_inc(api: SolanaRpcMode) {
         let api = match api {
             SolanaRpcMode::Solfees => "solfees",
             SolanaRpcMode::SolfeesFrontend => "frontend",
             _ => return,
         };
-        WEBSOCKETS_TOTAL.with_label_values(&[api]).inc()
+        WEBSOCKETS_ALIVE_TOTAL.with_label_values(&[api]).inc()
     }
 
-    pub fn websockets_dec(api: SolanaRpcMode) {
+    pub fn websockets_alive_dec(api: SolanaRpcMode) {
         let api = match api {
             SolanaRpcMode::Solfees => "solfees",
             SolanaRpcMode::SolfeesFrontend => "frontend",
             _ => return,
         };
-        WEBSOCKETS_TOTAL.with_label_values(&[api]).dec()
+        WEBSOCKETS_ALIVE_TOTAL.with_label_values(&[api]).dec()
     }
 }

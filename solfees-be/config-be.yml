@@ -12,9 +12,9 @@ listen_admin:
 
 listen_rpc:
   bind: 127.0.0.1:8000
-  body_limit: 16KiB
-  request_calls_max: 10 # Maximum number of calls in on request
-  request_timeout: 60s
-  request_queue_max: 1000
-  streams_channel_capacity: 150
-  pool_size: 2
+  body_limit: 16KiB # Maximum body size
+  request_calls_max: 5 # Maximum number of calls in on request
+  request_timeout: 60s # Request timeout (processed by dedicated tasks, see `pool_size`)
+  request_queue_max: 5000 # Maximum number of requests in the queue (each request can contain max `request_calls_max` calls)
+  streams_channel_capacity: 300 # Maximum number of messages in WebSocket channel before disconnect
+  pool_size: 2 # Number of workers processing requests (WebSocket streams processed by separate task)

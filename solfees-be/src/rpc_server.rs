@@ -16,7 +16,7 @@ use {
         rt::tokio::{TokioExecutor, TokioIo},
         server::{conn::auto::Builder as ServerBuilder, graceful::GracefulShutdown},
     },
-    std::{net::SocketAddr, sync::Arc},
+    std::{net::SocketAddr, sync::Arc, time::Instant},
     tokio::{
         net::TcpListener,
         sync::{broadcast, Notify},
@@ -115,8 +115,8 @@ pub async fn run_solfees(
 
                     match req_type {
                         ReqType::Rpc => {
-                            metrics_be::requests_inc(solana_rpc_mode);
-                            match Limited::new(req.into_body(), body_limit)
+                            let ts = Instant::now();
+                            let response = match Limited::new(req.into_body(), body_limit)
                                 .collect()
                                 .map_err(|error| anyhow::anyhow!(error))
                                 .and_then(|body| {
@@ -128,15 +128,24 @@ pub async fn run_solfees(
                                 })
                                 .await
                             {
-                                Ok(body) => Response::builder()
-                                    .header(CONTENT_TYPE, "application/json; charset=utf-8")
-                                    .header(ACCESS_CONTROL_ALLOW_METHODS, "OPTIONS, POST")
-                                    .header(ACCESS_CONTROL_ALLOW_ORIGIN, "*")
-                                    .body(BodyFull::new(Bytes::from(body)).boxed()),
+                                Ok((stats, body)) => {
+                                    metrics_be::requests_call_inc(solana_rpc_mode, stats);
+                                    Response::builder()
+                                        .header(CONTENT_TYPE, "application/json; charset=utf-8")
+                                        .header(ACCESS_CONTROL_ALLOW_METHODS, "OPTIONS, POST")
+                                        .header(ACCESS_CONTROL_ALLOW_ORIGIN, "*")
+                                        .body(BodyFull::new(Bytes::from(body)).boxed())
+                                }
                                 Err(error) => Response::builder()
                                     .status(StatusCode::INTERNAL_SERVER_ERROR)
                                     .body(BodyFull::new(Bytes::from(format!("{error}"))).boxed()),
-                            }
+                            };
+                            metrics_be::requests_observe(
+                                solana_rpc_mode,
+                                response.as_ref().map(|resp| resp.status()).ok(),
+                                ts.elapsed(),
+                            );
+                            response
                         }
                         ReqType::WebSocket => {
                             match hyper_tungstenite::upgrade(
