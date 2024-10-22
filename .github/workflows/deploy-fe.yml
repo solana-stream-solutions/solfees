@@ -33,6 +33,7 @@ jobs:
         with:
           node-version: 22
           cache: 'pnpm'
+          working-directory: solfees-fe
       - name: Install node_modules
         run: pnpm install
         working-directory: solfees-fe
@@ -43,4 +44,3 @@ jobs:
         uses: JamesIves/github-pages-deploy-action@v4
         with:
           folder: solfees-fe/build
-          #test
