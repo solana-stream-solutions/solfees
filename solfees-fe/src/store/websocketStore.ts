@@ -66,6 +66,7 @@ export const useWebSocketStore = create<WebSocketState>((set, get: () => WebSock
       };
     } else if (target === "store") {
       const handleMessage = (event: MessageEvent) => {
+        // TODO limit messages in queue to X. We can reach the limit message processing will be paused
         const data = typeof event.data !== "string" ? event.data : (JSON.parse(event.data) as any);
         if (data.result.slot) {
           const update = data.result.slot as SlotContent;

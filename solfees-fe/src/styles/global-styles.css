@@ -5,6 +5,9 @@
 .Modal_hasOverlay {
   z-index: 2;
 }
+.CustomContextMenu {
+  z-index: 2;
+}
 .recharts-default-tooltip {
   margin: 0px;
   padding: 10px;

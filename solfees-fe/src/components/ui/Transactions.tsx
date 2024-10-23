@@ -26,7 +26,7 @@ function buildTransactions(slots: CustomRow["transactions"], withFiltered = fals
   });
   const hasDupes = new Set(aligned).size !== aligned.length;
   const alignedWithKeys = aligned.map((value, idx) => {
-    const key = hasDupes ? `${idx}-value` : value;
+    const key = hasDupes ? `${idx}-${value}` : value;
     return { key, value };
   });
   return alignedWithKeys;

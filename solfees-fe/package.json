@@ -24,7 +24,7 @@
   },
   "dependencies": {
     "@consta/icons": "^1.1.0",
-    "@consta/table": "^0.0.1",
+    "@consta/table": "0.1.0-beta",
     "@consta/uikit": "^5.9.2",
     "@tanstack/react-query": "^5.53.1",
     "@tanstack/react-router": "^1.51.6",

@@ -1,9 +1,8 @@
 import type { FunctionComponent } from "../common/types";
-import { CSSProperties, ReactNode, useCallback, useDeferredValue, useMemo, useState } from "react";
+import { ReactNode, useCallback, useDeferredValue, useMemo, useState } from "react";
 import { SlotContent, useWebSocketStore } from "../store/websocketStore.ts";
 import { Table, TableColumn } from "@consta/table/Table";
 import { IconInfoCircle } from "@consta/icons/IconInfoCircle";
-import { IconFunnel } from "@consta/icons/IconFunnel";
 import { IconEdit } from "@consta/icons/IconEdit";
 import { withTooltip } from "@consta/uikit/withTooltip";
 import { Button } from "@consta/uikit/Button";
@@ -26,6 +25,7 @@ import { PlotLayer } from "../components/layout/PlotLayer.tsx";
 import { prepareValidatorRow } from "../common/prepareValidatorRow.ts";
 import { EarnedSol } from "../components/ui/EarnedSol.tsx";
 import { NextSlotInformer } from "../components/layout/NextSlotInformer.tsx";
+import { TransactionsHeaderButton } from "../components/ui/TransactionsHeaderButton.tsx";
 
 const ButtonWithTooltip = withTooltip({ content: "Top Tooltip" })(Button);
 
@@ -50,16 +50,10 @@ type TableProps = {
 const CustomTable = ({ onEditFee, onEditKeys }: TableProps) => {
   const slots2 = useWebSocketStore((state) => state.slots2);
   const percents = useWebSocketStore((state) => state.percents);
-  const readonlyKeys = useWebSocketStore((state) => state.readonlyKeys);
-  const readwriteKeys = useWebSocketStore((state) => state.readwriteKeys);
 
   const memoFee0 = useCallback(() => onEditFee(0), [onEditFee]);
   const memoFee1 = useCallback(() => onEditFee(1), [onEditFee]);
   const memoFee2 = useCallback(() => onEditFee(2), [onEditFee]);
-
-  const isTransactionsApplied = useMemo(() => {
-    return !!readwriteKeys.length || !!readonlyKeys.length;
-  }, [readwriteKeys.length, readonlyKeys.length]);
 
   const rowsFromSocket2 = useMemo(() => {
     const unsorted = slots2 as Record<string, SlotContent[]>;
@@ -88,23 +82,7 @@ const CustomTable = ({ onEditFee, onEditKeys }: TableProps) => {
         title: "Transactions",
         accessor: "transactions",
         renderHeaderCell: ({ title }) => (
-          <HeaderDataCell
-            controlRight={[
-              <Button
-                style={
-                  {
-                    "--button-color": isTransactionsApplied ? "red" : undefined,
-                    "--button-color-hover": isTransactionsApplied ? "darkred" : undefined,
-                  } as unknown as CSSProperties
-                }
-                view="clear"
-                size="s"
-                onlyIcon
-                iconRight={IconFunnel}
-                onClick={onEditKeys}
-              />,
-            ]}
-          >
+          <HeaderDataCell controlRight={[<TransactionsHeaderButton onEditKeys={onEditKeys} />]}>
             {title}
           </HeaderDataCell>
         ),
@@ -217,7 +195,7 @@ const CustomTable = ({ onEditFee, onEditKeys }: TableProps) => {
         renderCell: ({ row }) => <SimpleCell list={row.fee2} />,
       },
     ];
-  }, [isTransactionsApplied, onEditKeys, percents, memoFee0, memoFee1, memoFee2]);
+  }, [onEditKeys, percents, memoFee0, memoFee1, memoFee2]);
 
   const deferredValue = useDeferredValue(rowsFromSocket2);
 
@@ -312,7 +290,7 @@ export const HomeNew = (): FunctionComponent => {
       >
         click to view Table from @consta\uikit (old)
       </button>
-      <div className="px-20 py-5 bg-white w-full flex-col justify-start items-start gap-8 inline-flex h-[100vh] relative">
+      <div className="px-20 py-5 bg-white w-full flex-col justify-start items-start gap-8 inline-flex h-[100vh] relative overflow-y-hidden">
         <div className="self-stretch justify-between items-center inline-flex">
           <div className="justify-start items-center gap-2 flex">
             <IconFeed className="w-5 h-5 relative" />
