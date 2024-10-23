@@ -6,4 +6,4 @@ export const percentFromStore = (num?: number): number => {
     return value;
   }
   return 0;
-}
+};

@@ -1,5 +1,5 @@
-import {Navigate} from "@tanstack/react-router";
+import { Navigate } from "@tanstack/react-router";
 
 export const RootPage = () => {
-  return <Navigate to={'/homeNew'}/>
-}
+  return <Navigate to={"/homeNew"} />;
+};

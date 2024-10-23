@@ -1,7 +1,7 @@
-import {create} from "zustand";
+import { create } from "zustand";
 
 interface ServerAnswerSchedule {
-  result: null | EpochSchedule
+  result: null | EpochSchedule;
 }
 
 interface EpochSchedule {
@@ -10,12 +10,11 @@ interface EpochSchedule {
 }
 
 type ScheduleState = {
-  updateSchedule: (epoch: number) => Promise<void>
+  updateSchedule: (epoch: number) => Promise<void>;
   indices: number[];
   leaders: string[];
   epoch: number;
-}
-
+};
 
 export const useScheduleStore = create<ScheduleState>((set, get: () => ScheduleState) => {
   let isRequested = false;
@@ -27,26 +26,24 @@ export const useScheduleStore = create<ScheduleState>((set, get: () => ScheduleS
     if (requestFailedAt && Date.now() - requestFailedAt.getTime() > 5_000) {
       try {
         isRequested = true;
-        const response = await fetch('https://api.solfees.io/api/solfees', {
-          method: 'POST',
+        const response = await fetch("https://api.solfees.io/api/solfees", {
+          method: "POST",
           body: JSON.stringify({
-            method: 'getLeaderSchedule',
-            jsonrpc: '2.0',
-            params: [
-              {epoch},
-            ],
-            id: '1',
+            method: "getLeaderSchedule",
+            jsonrpc: "2.0",
+            params: [{ epoch }],
+            id: "1",
           }),
         });
-        const serverData = await response.json() as ServerAnswerSchedule;
+        const serverData = (await response.json()) as ServerAnswerSchedule;
         if (serverData.result === null) {
           requestFailedAt = new Date();
           return null;
         }
-        return serverData.result
+        return serverData.result;
       } catch (e) {
-        console.warn(e)
-        requestFailedAt = new Date()
+        console.warn(e);
+        requestFailedAt = new Date();
       } finally {
         isRequested = false;
       }
@@ -55,28 +52,28 @@ export const useScheduleStore = create<ScheduleState>((set, get: () => ScheduleS
   }
 
   async function updateSchedule(slot: number) {
-    const epoch = (slot / 432_000) | 0
+    const epoch = (slot / 432_000) | 0;
     if (epoch && epoch !== get().epoch) {
-      const dataFromLS = loadFromLS(epoch)
-      const dataFromApi = dataFromLS ? null : await fetchSchedule(epoch)
-      const data = dataFromLS || dataFromApi
+      const dataFromLS = loadFromLS(epoch);
+      const dataFromApi = dataFromLS ? null : await fetchSchedule(epoch);
+      const data = dataFromLS || dataFromApi;
       if (data) {
-        saveToLS(epoch, data)
+        saveToLS(epoch, data);
         set({
           epoch,
           indices: data.indices,
           leaders: data.leaders,
-        })
+        });
       }
     }
   }
 
   function loadFromLS(requestedEpoch: number): null | EpochSchedule {
-    const epochFromLS = localStorage.getItem('savedEpoch');
+    const epochFromLS = localStorage.getItem("savedEpoch");
     if (epochFromLS && +epochFromLS === requestedEpoch) {
-      const dataFromLS = localStorage.getItem('savedSchedule')
+      const dataFromLS = localStorage.getItem("savedSchedule");
       if (dataFromLS) {
-        const schedule = JSON.parse(dataFromLS) as EpochSchedule
+        const schedule = JSON.parse(dataFromLS) as EpochSchedule;
         return schedule;
       }
     }
@@ -84,15 +81,14 @@ export const useScheduleStore = create<ScheduleState>((set, get: () => ScheduleS
   }
 
   function saveToLS(epoch: number, schedule: EpochSchedule) {
-    localStorage.setItem('savedEpoch', epoch.toString())
-    localStorage.setItem('savedSchedule', JSON.stringify(schedule))
+    localStorage.setItem("savedEpoch", epoch.toString());
+    localStorage.setItem("savedSchedule", JSON.stringify(schedule));
   }
-
 
   return {
     epoch: 0,
     indices: [],
     leaders: [],
     updateSchedule,
-  }
-})
+  };
+});

@@ -6,7 +6,7 @@
   "scripts": {
     "predeploy": "pnpm run build",
     "deploy": "gh-pages -d dist --cname solfees.io",
-    "format": "prettier src/**/*.{ts,tsx} --write",
+    "format": "prettier **/*.{js,jsx,ts,tsx,json,css,md} --write",
     "lint": "eslint --max-warnings 0",
     "lint:fix": "eslint --max-warnings 0 --fix",
     "dev": "vite",
@@ -21,7 +21,7 @@
     "prepare": "cd .. && husky ./solfees-fe/.husky"
   },
   "lint-staged": {
-    "*.{js,jsx,ts,tsx,json,css}": "prettier . --write --ignore-unknown"
+    "**/solfees-fe/**/*.{js,jsx,ts,tsx,json,css,md}": "prettier . --write --ignore-unknown"
   },
   "dependencies": {
     "@consta/icons": "^1.1.0",

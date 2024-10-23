@@ -1,6 +1,6 @@
 # src/assets
 
-Any assets placed in src/assets will be bundled with application. 
+Any assets placed in src/assets will be bundled with application.
 
 If you intend to reference static assets from your application code then they must be placed in this directory (or anywhere inside of the src directory).
 

@@ -8,27 +8,27 @@ import { isProduction } from "./utils";
 
 export const defaultNS = "translations";
 export const resources = {
-	en: { translations: translationEN },
-	es: { translations: translationES },
+  en: { translations: translationEN },
+  es: { translations: translationES },
 } as const;
 
 const i18nOptions: InitOptions<HttpBackendOptions> = {
-	defaultNS,
-	ns: [defaultNS],
-	debug: !isProduction,
-	fallbackLng: "en",
-	interpolation: {
-		escapeValue: false, // not needed for react as it escapes by default
-	},
-	backend: {
-		loadPath: isProduction
-			? "locales/{{lng}}/translations.json"
-			: "src/assets/locales/{{lng}}/translations.json",
-	},
+  defaultNS,
+  ns: [defaultNS],
+  debug: !isProduction,
+  fallbackLng: "en",
+  interpolation: {
+    escapeValue: false, // not needed for react as it escapes by default
+  },
+  backend: {
+    loadPath: isProduction
+      ? "locales/{{lng}}/translations.json"
+      : "src/assets/locales/{{lng}}/translations.json",
+  },
 };
 
 void i18n
-	.use(initReactI18next)
-	.use(LanguageDetector)
-	.use(Backend)
-	.init<HttpBackendOptions>(i18nOptions);
+  .use(initReactI18next)
+  .use(LanguageDetector)
+  .use(Backend)
+  .init<HttpBackendOptions>(i18nOptions);
