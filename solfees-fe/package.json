@@ -1,18 +1,5 @@
 {
-  "name": "vite-react-boilerplate",
-  "author": "Ricardo Valdovinos <ricardovaldovinos1996@gmail.com>",
-  "description": "A production ready, batteries included starter template for Vite + React projects",
-  "keywords": [
-    "vite",
-    "react",
-    "boilerplate",
-    "starter",
-    "template"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/RicardoValdovinos/vite-react-boilerplate"
-  },
+  "name": "solfees-fe",
   "license": "MIT",
   "version": "1.0.0",
   "type": "module",
@@ -31,8 +18,10 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "commitlint": "commitlint --edit",
-    "commitizen": "exec < /dev/tty && git cz --hook || true",
-    "prepare": "husky"
+    "prepare": "cd .. && husky ./solfees-fe/.husky"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,json,css}": "prettier . --write --ignore-unknown"
   },
   "dependencies": {
     "@consta/icons": "^1.1.0",
@@ -52,6 +41,7 @@
     "zustand": "^4.5.5"
   },
   "devDependencies": {
+    "lint-staged": "^15.2.9",
     "@commitlint/cli": "^19.4.1",
     "@commitlint/config-conventional": "^19.4.1",
     "@eslint/compat": "^1.1.1",
