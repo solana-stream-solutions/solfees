@@ -6,7 +6,7 @@
   "scripts": {
     "predeploy": "pnpm run build",
     "deploy": "gh-pages -d dist --cname solfees.io",
-    "format": "prettier **/*.{js,jsx,ts,tsx,json,css,md} --write",
+    "format": "prettier **/*.{js,jsx,ts,tsx,json,css,md} --write --ignore-unknown",
     "lint": "eslint --max-warnings 0",
     "lint:fix": "eslint --max-warnings 0 --fix",
     "dev": "vite",
