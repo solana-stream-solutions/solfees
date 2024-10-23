@@ -17,11 +17,10 @@
     "test:unit:coverage": "vitest --coverage src/",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "commitlint": "commitlint --edit",
     "prepare": "cd .. && husky ./solfees-fe/.husky"
   },
   "lint-staged": {
-    "**/solfees-fe/**/*.{js,jsx,ts,tsx,json,css,md}": "prettier . --write --ignore-unknown"
+    "**/*.{js,jsx,ts,tsx,json,css,md}": "prettier . --write --ignore-unknown"
   },
   "dependencies": {
     "@consta/icons": "^1.1.0",
