@@ -40160,23 +40160,21 @@ const CustomTable = ({
   const columns = reactExports.useMemo(() => {
     return [
       {
+        minWidth: 150,
         title: "Validator",
         accessor: "leader",
-        minWidth: 150,
         renderCell: ({ row }) => /* @__PURE__ */ jsxRuntimeExports.jsx(Validator, { leader: row.leader })
       },
       {
-        width: "auto",
         minWidth: 170,
         title: "Slots",
         accessor: "slots",
         renderCell: ({ row }) => /* @__PURE__ */ jsxRuntimeExports.jsx(Slots, { items: row.slots })
       },
       {
+        minWidth: 160,
         title: "Transactions",
         accessor: "transactions",
-        width: "auto",
-        minWidth: 160,
         renderHeaderCell: ({ title }) => /* @__PURE__ */ jsxRuntimeExports.jsx(
           HeaderDataCell,
           {
@@ -40193,7 +40191,6 @@ const CustomTable = ({
       },
       {
         title: "Compute Units",
-        width: "auto",
         minWidth: 216,
         accessor: "computeUnits",
         renderHeaderCell: ({ title }) => /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -40208,9 +40205,8 @@ const CustomTable = ({
         renderCell: ({ row }) => /* @__PURE__ */ jsxRuntimeExports.jsx(ComputeUnits, { items: row.computeUnits })
       },
       {
-        width: "auto",
-        title: "Earned SOL",
         minWidth: 160,
+        title: "Earned SOL",
         accessor: "earnedSol",
         renderHeaderCell: ({ title }) => /* @__PURE__ */ jsxRuntimeExports.jsx(
           HeaderDataCell,
@@ -40224,10 +40220,9 @@ const CustomTable = ({
         renderCell: ({ row }) => /* @__PURE__ */ jsxRuntimeExports.jsx(EarnedSol, { list: row.earnedSol })
       },
       {
-        title: "Average Fee",
         minWidth: 160,
         accessor: "averageFee",
-        width: "auto",
+        title: "Average Fee",
         renderHeaderCell: ({ title }) => /* @__PURE__ */ jsxRuntimeExports.jsx(
           HeaderDataCell,
           {
@@ -40240,7 +40235,6 @@ const CustomTable = ({
         renderCell: ({ row }) => /* @__PURE__ */ jsxRuntimeExports.jsx(SimpleCell, { list: row.averageFee })
       },
       {
-        width: "auto",
         minWidth: 160,
         title: "Fee p" + percentFromStore(percents[0]),
         accessor: "fee0",
@@ -40266,7 +40260,6 @@ const CustomTable = ({
         renderCell: ({ row }) => /* @__PURE__ */ jsxRuntimeExports.jsx(SimpleCell, { list: row.fee0 })
       },
       {
-        width: "auto",
         minWidth: 160,
         title: "Fee p" + percentFromStore(percents[1]),
         accessor: "fee1",
@@ -40292,7 +40285,6 @@ const CustomTable = ({
         renderCell: ({ row }) => /* @__PURE__ */ jsxRuntimeExports.jsx(SimpleCell, { list: row.fee1 })
       },
       {
-        width: "auto",
         minWidth: 160,
         title: "Fee p" + percentFromStore(percents[2]),
         accessor: "fee2",
@@ -44181,4 +44173,4 @@ if (!rootElement.innerHTML) {
     /* @__PURE__ */ jsxRuntimeExports.jsx(React.Suspense, { fallback: "loading", children: /* @__PURE__ */ jsxRuntimeExports.jsx(App, { router }) })
   );
 }
-//# sourceMappingURL=index-BliWtvGt.js.map
+//# sourceMappingURL=index-CBgUBKgL.js.map
