@@ -17,7 +17,7 @@ function formatDuration(seconds: number) {
   return `${days} day(s), ${hours} hour(s), ${minutes} minute(s), ${seconds} second(s)`;
 }
 
-const TextWithTooltip = withTooltip({ content: "Тултип сверху" })(Text);
+const TextWithTooltip = withTooltip({ content: "Top tooltip" })(Text);
 
 export const Epoch = () => {
   const slots2 = useWebSocketStore((state) => state.slots2);
@@ -45,9 +45,9 @@ export const Epoch = () => {
         style: "long", // other values: "short" or "narrow"
       });
       const secs = (432_000 - (lastSlot % 432_000)) * 0.4;
-      if (secs < 90) return rtf.format(secs, "seconds"); // 1.5 минуты
-      if (secs < 90 * 60) return rtf.format((secs / 60) | 0, "minutes"); // 1.5ч
-      if (secs < 1.5 * 86_400) return rtf.format((secs / 3_600) | 0, "hours"); // 1.5д
+      if (secs < 90) return rtf.format(secs, "seconds"); // 1.5 minutes
+      if (secs < 90 * 60) return rtf.format((secs / 60) | 0, "minutes"); // 1.5 hours
+      if (secs < 1.5 * 86_400) return rtf.format((secs / 3_600) | 0, "hours"); // 1.5 days
       return rtf.format((secs / 86_400) | 0, "days");
     }
     return "...";

@@ -21,12 +21,11 @@ export const ModalFilter = ({ isVisible, onClose }: ModalFilterProps) => {
   const updateSubscription = useWebSocketStore(useShallow((state) => state.updateSubscription));
 
   const onClickButton = useCallback(() => {
-    // Может быть проблема, что пишет массив с одним элементом "" (пустая строка). Уточнить потом.
     updateRo(roValue.split("\n"));
     updateRw(rwValue.split("\n"));
     updateSubscription();
     onClose();
-  }, [updateRo, roValue, updateRw, rwValue, onClose]);
+  }, [updateRo, roValue, updateRw, rwValue, onClose, updateSubscription]);
   useLayoutEffect(() => {
     if (isVisible) {
       setRoValue(savedReadonlyKeys.join("\n"));

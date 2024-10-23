@@ -51,7 +51,7 @@ export const useWebSocketStore = create<WebSocketState>((set, get: () => WebSock
     if (isLocked) return;
     const lastCommitDuration = Date.now() - lastProcessedTime;
     if (lastCommitDuration > 5_000) {
-      /* TODO: здесь надо сделать reconnect */
+      /* TODO: make reconnect if no new payloads */
     }
   }, 5000);
 
@@ -77,7 +77,7 @@ export const useWebSocketStore = create<WebSocketState>((set, get: () => WebSock
               slots2[groupIdx] = [...slots2[groupIdx], update]
                 .sort((a, b) => b.slot - a.slot)
                 .filter((elt, idx, arr) => {
-                  // Вероятная причина дублей -- сваливание в queue мусора ото всех сторон
+                  // probably I have dupes because I enqueue a lot of stuff without filtering
                   const sameIdx = arr.findIndex((sameElt) => sameElt.slot === elt.slot);
                   return sameIdx === idx;
                 });
@@ -85,7 +85,7 @@ export const useWebSocketStore = create<WebSocketState>((set, get: () => WebSock
               slots2[groupIdx] = [...slots2[groupIdx], update]
                 .sort((a, b) => b.slot - a.slot)
                 .filter((elt, idx, arr) => {
-                  // Вероятная причина дублей -- сваливание в queue мусора ото всех сторон
+                  // probably I have dupes because I enqueue a lot of stuff without filtering
                   const sameIdx = arr.findIndex((sameElt) => sameElt.slot === elt.slot);
                   return sameIdx === idx;
                 });
@@ -95,8 +95,7 @@ export const useWebSocketStore = create<WebSocketState>((set, get: () => WebSock
               if (keys.length > 38) {
                 const target = Math.min(...keys.map(Number));
                 delete slots2[target];
-                // Удаление целой группы негативно влияет на восприятие графиков, может тут надо по одному удалять?
-                // Или помечать такую группу к удалению. Надо подумать
+                // TODO if you remove a group -- plots have shift. Probably need split "view" by validator and list of slots for plots
               }
             }
 
@@ -131,14 +130,13 @@ export const useWebSocketStore = create<WebSocketState>((set, get: () => WebSock
           return;
         }
         if (data.result === "subscribed") {
-          // Это сообщение, что подписка удалась и нет проблем
           return;
         }
         console.warn("unrecognized", data);
       };
       socket.onmessage = function (e: MessageEvent) {
         queue.push(e);
-        // Костыль для перфоманса, можно ставить 1 сек и обновления будет меньше
+        // perfomance crutch to avoid multiple redraws because we can have up to 30 messages per second
         if (!isLocked && Date.now() - lastProcessedTime > 250) {
           queue.length > 25 && console.log("queued from WS:", queue.length);
           queue.forEach(handleMessage);
@@ -172,7 +170,7 @@ export const useWebSocketStore = create<WebSocketState>((set, get: () => WebSock
         }),
       });
       const serverData = (await response.json()) as ServerAnswerFees;
-      // Я же сообщения из HTTP добавляю в конец очереди, а надо в начало. Вероятно стоит переиграть, если баги будут
+      // I add messages to the end of the queue. Probably I should add it to the beginning
       serverData.result.forEach((result) => {
         queue.push(new MessageEvent("fromJs", { data: { result } }));
       });
@@ -216,7 +214,6 @@ export const useWebSocketStore = create<WebSocketState>((set, get: () => WebSock
       set({ readonlyKeys });
     },
     updateReadwriteKeys: (readwriteKeys) => {
-      // сюда еще проверку валидности ключа надо положить, пока обработал корнеркейсы
       if (JSON.stringify(readwriteKeys) === JSON.stringify([""])) {
         set({ readwriteKeys: [] });
         return;

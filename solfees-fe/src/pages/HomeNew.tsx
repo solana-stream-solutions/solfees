@@ -27,7 +27,7 @@ import { prepareValidatorRow } from "../common/prepareValidatorRow.ts";
 import { EarnedSol } from "../components/ui/EarnedSol.tsx";
 import { NextSlotInformer } from "../components/layout/NextSlotInformer.tsx";
 
-const ButtonWithTooltip = withTooltip({ content: "Тултип сверху" })(Button);
+const ButtonWithTooltip = withTooltip({ content: "Top Tooltip" })(Button);
 
 const InfoButton = (props: TooltipProps): ReactNode => {
   return (
@@ -221,7 +221,7 @@ const CustomTable = ({ onEditFee, onEditKeys }: TableProps) => {
 
   const deferredValue = useDeferredValue(rowsFromSocket2);
 
-  // Этим проверял, что построение без UI KIT быстрее
+  // For testing with simple table layout (no components, only HTML tags)
   const isSimple = false;
   if (isSimple)
     return (

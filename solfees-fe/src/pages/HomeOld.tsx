@@ -34,7 +34,7 @@ import { percentFromStore } from "../common/utils.ts";
 import { ModalFee } from "../components/ui/ModalFee.tsx";
 import { CustomRow } from "../common/prepareValidatorRow.ts";
 
-const ButtonWithTooltip = withTooltip({ content: "Тултип сверху" })(Button);
+const ButtonWithTooltip = withTooltip({ content: "Top tooltip" })(Button);
 
 const InfoButton = (props: TooltipProps): ReactNode => {
   return (
@@ -48,8 +48,6 @@ const InfoButton = (props: TooltipProps): ReactNode => {
     />
   );
 };
-
-const TextWithTooltip = withTooltip({ content: "Тултип сверху" })(Text);
 
 function buildTransactions(slots: SlotContent[]) {
   const first = slots.map((elt) => elt.totalTransactions - elt.totalTransactionsVote);

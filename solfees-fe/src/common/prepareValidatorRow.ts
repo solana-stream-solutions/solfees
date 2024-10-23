@@ -1,6 +1,5 @@
 import { CommitmentStatus, SlotContent } from "../store/websocketStore.ts";
 
-// TODO isTransactionsApplied перенести внутрь компонента, он тут не нужен будет
 export type CustomRow = {
   id: string;
   leader: string;

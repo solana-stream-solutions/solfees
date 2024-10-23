@@ -202,7 +202,6 @@ export const ExampleAreaOne = () => {
             processed: null,
           },
         } satisfies PlotInfo;
-        // Я хз чего он ругается, но заглушим
         obj.value[elt.commitment] = obj.y as unknown as null;
         return obj;
       });
@@ -210,7 +209,7 @@ export const ExampleAreaOne = () => {
       acc.push(...sorted);
       return acc;
     }, []);
-    // Второй раз пробегаемся, закрываем дырки, если статусы разные
+    // fill gaps for area plots
     const filledGapsData = packedData.map((elt, idx, arr) => {
       const prevPrev = arr[idx - 2];
       const prev = arr[idx - 1];
@@ -218,7 +217,7 @@ export const ExampleAreaOne = () => {
         if (prev.commitment !== elt.commitment) {
           prev.value[elt.commitment] = prev.y;
         }
-        // Corner Case ситуации A A A B A A
+        // Corner Case for dots with theese commitment statuses: A A A B A A A
         if (prevPrev) {
           if (prev.commitment !== elt.commitment && prevPrev.commitment === elt.commitment) {
             elt.value[prev.commitment] = elt.y;
@@ -299,7 +298,6 @@ export const ExampleAreaOneBar = () => {
             processed: null,
           },
         } satisfies PlotInfo;
-        // Я хз чего он ругается, но заглушим
         obj.value[elt.commitment] = obj.y as unknown as null;
         return obj;
       });
@@ -376,7 +374,6 @@ export const ExampleAreaTwo = () => {
             processed: null,
           },
         } satisfies PlotInfo;
-        // Я хз чего он ругается, но заглушим
         obj.value[elt.commitment] = obj.y as unknown as null;
         return obj;
       });
@@ -384,7 +381,7 @@ export const ExampleAreaTwo = () => {
       acc.push(...sorted);
       return acc;
     }, []);
-    // Второй раз пробегаемся, закрываем дырки, если статусы разные
+    // fill gaps for area plots
     const filledGapsData = packedData.map((elt, idx, arr) => {
       const prevPrev = arr[idx - 2];
       const prev = arr[idx - 1];
@@ -392,7 +389,7 @@ export const ExampleAreaTwo = () => {
         if (prev.commitment !== elt.commitment) {
           prev.value[elt.commitment] = prev.y;
         }
-        // Corner Case ситуации A A A B A A
+        // Corner Case for dots with theese commitment statuses: A A A B A A A
         if (prevPrev) {
           if (prev.commitment !== elt.commitment && prevPrev.commitment === elt.commitment) {
             elt.value[prev.commitment] = elt.y;
@@ -472,7 +469,6 @@ export const ExampleAreaTwoBar = () => {
             processed: null,
           },
         } satisfies PlotInfo;
-        // Я хз чего он ругается, но заглушим
         obj.value[elt.commitment] = obj.y as unknown as null;
         return obj;
       });
@@ -480,7 +476,7 @@ export const ExampleAreaTwoBar = () => {
       acc.push(...sorted);
       return acc;
     }, []);
-    // Второй раз пробегаемся, закрываем дырки, если статусы разные
+    // fill gaps for area plots
     return packedData;
   }, [slots2]);
   return (
@@ -530,7 +526,7 @@ export const ExampleAreaTwoBar = () => {
   );
 };
 
-// Черновики для тестов как тултипы в графиках будут себя вести
+// Drafts for tooltips, better to rewrite
 function simpleFormatter(value: string, name: string): [string, string] {
   let formattedValue = value;
   let formattedName = name;
