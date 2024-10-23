@@ -69,21 +69,19 @@ const CustomTable = ({
   const columns: TableColumn<typeof rowsFromSocket2[number]>[] = useMemo(() => {
     return [
       {
+        minWidth: 150,
         title: 'Validator',
         accessor: 'leader',
-        minWidth: 150,
         renderCell: ({row}) => <Validator leader={row.leader}/>,
       }, {
-        width: 'auto',
         minWidth: 170,
         title: 'Slots',
         accessor: 'slots',
         renderCell: ({row}) => <Slots items={row.slots}/>,
       }, {
+        minWidth: 160,
         title: 'Transactions',
         accessor: 'transactions',
-        width: 'auto',
-        minWidth: 160,
         renderHeaderCell: ({title}) => <HeaderDataCell
           controlRight={[
             <Button style={{
@@ -97,7 +95,6 @@ const CustomTable = ({
         renderCell: ({row}) => <Transactions items={row.transactions}/>,
       }, {
         title: 'Compute Units',
-        width: 'auto',
         minWidth: 216,
         accessor: 'computeUnits',
         renderHeaderCell: ({title}) => <HeaderDataCell
@@ -109,9 +106,8 @@ const CustomTable = ({
         </HeaderDataCell>,
         renderCell: ({row}) => <ComputeUnits items={row.computeUnits}/>,
       }, {
-        width: 'auto',
-        title: 'Earned SOL',
         minWidth: 160,
+        title: 'Earned SOL',
         accessor: 'earnedSol',
         renderHeaderCell: ({title}) => <HeaderDataCell
           controlRight={[
@@ -123,10 +119,9 @@ const CustomTable = ({
         renderCell: ({row}) => <EarnedSol list={row.earnedSol}/>,
 
       }, {
-        title: 'Average Fee',
         minWidth: 160,
         accessor: 'averageFee',
-        width: 'auto',
+        title: 'Average Fee',
 
         renderHeaderCell: ({title}) => <HeaderDataCell
           controlRight={[
@@ -138,7 +133,6 @@ const CustomTable = ({
         renderCell: ({row}) => <SimpleCell list={row.averageFee}/>,
 
       }, {
-        width: 'auto',
         minWidth: 160,
         title: 'Fee p' + percentFromStore(percents[0]),
         accessor: 'fee0',
@@ -153,9 +147,7 @@ const CustomTable = ({
         renderCell: ({row}) => <SimpleCell list={row.fee0}/>,
 
       }, {
-        width: 'auto',
         minWidth: 160,
-
         title: 'Fee p' + percentFromStore(percents[1]),
         accessor: 'fee1',
         renderHeaderCell: ({title}) => <HeaderDataCell
@@ -169,9 +161,7 @@ const CustomTable = ({
         renderCell: ({row}) => <SimpleCell list={row.fee1}/>,
 
       }, {
-        width: 'auto',
         minWidth: 160,
-
         title: 'Fee p' + percentFromStore(percents[2]),
         accessor: 'fee2',
         renderHeaderCell: ({title}) => <HeaderDataCell
@@ -269,7 +259,7 @@ export const HomeNew = (): FunctionComponent => {
         <Epoch/>
       </div>
       <PlotLayer/>
-      <NextSlotInformer />
+      <NextSlotInformer/>
       <CustomTable onEditFee={setEditedFeeIdx} onEditKeys={filterModalControls.on}/>
       <ModalFee editedFeeIdx={editedFeeIdx} isVisible={editedFeeIdx >= 0} onClose={() => setEditedFeeIdx(-1)}/>
       <ModalFilter isVisible={filterModalShown} onClose={filterModalControls.off}/>
