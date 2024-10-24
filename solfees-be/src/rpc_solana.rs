@@ -13,8 +13,7 @@ use {
     hyper_tungstenite::HyperWebsocket,
     jsonrpc_core::{
         Call as JsonrpcCall, Error as JsonrpcError, Failure as JsonrpcFailure, Id as JsonrpcId,
-        MethodCall as JsonrpcMethodCall, Output as JsonrpcOutput, Response as JsonrpcResponse,
-        Success as JsonrpcSuccess, Version as JsonrpcVersion,
+        MethodCall as JsonrpcMethodCall, Value as JsonrcpValue, Version as JsonrpcVersion,
     },
     serde::{Deserialize, Serialize},
     solana_rpc_client_api::{
@@ -53,6 +52,30 @@ use {
 };
 
 const MAX_NUM_RECENT_SLOT_INFO: usize = 150;
+
+#[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+#[serde(untagged)]
+enum JsonrpcOutputArced {
+    Success(JsonrpcSuccessArced),
+    Failure(JsonrpcFailure),
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct JsonrpcSuccessArced {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub jsonrpc: Option<JsonrpcVersion>,
+    pub result: JsonrcpValueArced,
+    pub id: JsonrpcId,
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+enum JsonrcpValueArced {
+    Value(JsonrcpValue),
+    MaybeArcedValue(Option<Arc<JsonrcpValue>>),
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SolanaRpcMode {
@@ -501,15 +524,15 @@ impl SolanaRpc {
         match outputs
             .into_iter()
             .map(|output| output.ok_or(()))
-            .collect::<Result<Vec<JsonrpcOutput>, ()>>()
+            .collect::<Result<Vec<JsonrpcOutputArced>, ()>>()
         {
-            Ok(mut outputs) => serde_json::to_vec(&if batched_calls {
-                JsonrpcResponse::Batch(outputs)
-            } else if let Some(output) = outputs.pop() {
-                JsonrpcResponse::Single(output)
+            Ok(outputs) => if batched_calls {
+                serde_json::to_vec(&outputs)
+            } else if let Some(output) = outputs.last() {
+                serde_json::to_vec(output)
             } else {
                 anyhow::bail!("output is not defined")
-            })
+            }
             .map_err(Into::into),
             Err(()) => {
                 anyhow::bail!("not all outputs created")
@@ -646,13 +669,18 @@ impl SolanaRpc {
         metrics::websockets_alive_dec(mode);
     }
 
-    fn create_success<R>(jsonrpc: Option<JsonrpcVersion>, id: JsonrpcId, result: R) -> JsonrpcOutput
+    fn create_success<R>(
+        jsonrpc: Option<JsonrpcVersion>,
+        id: JsonrpcId,
+        result: R,
+    ) -> JsonrpcOutputArced
     where
         R: Serialize,
     {
-        JsonrpcOutput::Success(JsonrpcSuccess {
+        let value = serde_json::to_value(result).expect("failed to serialize");
+        JsonrpcOutputArced::Success(JsonrpcSuccessArced {
             jsonrpc,
-            result: serde_json::to_value(result).expect("failed to serialize"),
+            result: JsonrcpValueArced::Value(value),
             id,
         })
     }
@@ -661,8 +689,8 @@ impl SolanaRpc {
         jsonrpc: Option<JsonrpcVersion>,
         id: JsonrpcId,
         error: JsonrpcError,
-    ) -> JsonrpcOutput {
-        JsonrpcOutput::Failure(JsonrpcFailure { jsonrpc, error, id })
+    ) -> JsonrpcOutputArced {
+        JsonrpcOutputArced::Failure(JsonrpcFailure { jsonrpc, error, id })
     }
 
     fn internal_error_with_data<R>(data: R) -> JsonrpcError
@@ -723,8 +751,8 @@ impl SolanaRpc {
         let mut slots_info = BTreeMap::<Slot, StreamsSlotInfo>::new();
 
         let epoch_schedule = EpochSchedule::custom(432_000, 432_000, false);
-        let mut leader_schedule_map_solfees = HashMap::new();
-        let mut leader_schedule_map_rpc = HashMap::new();
+        let mut leader_schedule_map_solfees = HashMap::<Slot, Arc<JsonrcpValue>>::new();
+        let mut leader_schedule_map_rpc = HashMap::<Slot, Arc<HashMap<String, Vec<usize>>>>::new();
 
         loop {
             tokio::select! {
@@ -834,7 +862,12 @@ impl SolanaRpc {
                                     }
                                     RpcRequest::LeaderSchedule { jsonrpc, id, slot, epoch, commitment, identity } => {
                                         if let Some(epoch) = epoch {
-                                            Self::create_success(jsonrpc, id, leader_schedule_map_solfees.get(&epoch))
+                                            let value = leader_schedule_map_solfees.get(&epoch).cloned();
+                                            JsonrpcOutputArced::Success(JsonrpcSuccessArced {
+                                                jsonrpc,
+                                                result: JsonrcpValueArced::MaybeArcedValue(value),
+                                                id,
+                                            })
                                         } else {
                                             let slot = slot.unwrap_or({
                                                 match commitment {
@@ -899,7 +932,7 @@ impl SolanaRpc {
                                     }
                                 }
                             })
-                            .collect::<Vec<JsonrpcOutput>>();
+                            .collect::<Vec<JsonrpcOutputArced>>();
 
                         let _ = rpc_requests.response_tx.send(outputs);
                     },
@@ -960,7 +993,7 @@ pub struct RpcRequestsStats {
 struct RpcRequests {
     requests: Vec<RpcRequest>,
     shutdown: Arc<AtomicBool>,
-    response_tx: oneshot::Sender<Vec<JsonrpcOutput>>,
+    response_tx: oneshot::Sender<Vec<JsonrpcOutputArced>>,
 }
 
 #[derive(Debug)]

@@ -17,7 +17,7 @@ pub enum RedisMessage {
     Geyser(GeyserMessage),
     Epoch {
         epoch: Epoch,
-        leader_schedule_solfees: Arc<LeadersScheduleSolfees>,
+        leader_schedule_solfees: Arc<serde_json::Value>,
         leader_schedule_rpc: Arc<LeaderScheduleRpc>,
     },
 }
@@ -28,10 +28,13 @@ impl RedisMessage {
             .with_context(|| format!("failed to deserialie epoch {epoch}"))?;
         let leader_schedule = LeadersSchedule::new(&leader_schedule_rpc)
             .with_context(|| format!("failed to build schedule for epoch {epoch}"))?;
+        let leader_schedule_solfees: LeadersScheduleSolfees = leader_schedule.into();
+        let leader_schedule_solfees =
+            serde_json::to_value(&leader_schedule_solfees).expect("failed to serialize");
 
         Ok(Self::Epoch {
             epoch,
-            leader_schedule_solfees: Arc::new(leader_schedule.into()),
+            leader_schedule_solfees: Arc::new(leader_schedule_solfees),
             leader_schedule_rpc: Arc::new(leader_schedule_rpc),
         })
     }
