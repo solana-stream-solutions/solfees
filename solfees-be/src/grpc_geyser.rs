@@ -34,6 +34,7 @@ use {
         metadata::{errors::InvalidMetadataValue, AsciiMetadataValue},
         transport::channel::ClientTlsConfig,
     },
+    tracing::error,
     yellowstone_grpc_client::GeyserGrpcClient,
     yellowstone_grpc_proto::prelude::{
         self as proto, subscribe_update::UpdateOneof, SubscribeRequest,
@@ -366,6 +367,7 @@ where
     let (tx, rx) = mpsc::unbounded_channel();
     let (schedule, schedule_rx) = SolanaSchedule::new(rpc_endpoint, saved_epochs);
     tokio::spawn(async move {
+        let mut slot_processed_first = None;
         let mut blocks = BTreeMap::<Slot, BlockInfo>::new();
 
         let mut alive = true;
@@ -375,12 +377,22 @@ where
                     proto::CommitmentLevel::try_from(info.status)
                         .map(|commitment| {
                             let commitment = CommitmentLevel::from(commitment);
-                            if commitment == CommitmentLevel::Finalized {
+                            if commitment == CommitmentLevel::Processed {
+                                if slot_processed_first.is_none() {
+                                    slot_processed_first = Some(info.slot);
+                                }
+                            } else if commitment == CommitmentLevel::Finalized {
                                 loop {
                                     match blocks.first_key_value() {
                                         Some((block_info_slot, _block_info))
                                             if *block_info_slot < info.slot =>
                                         {
+                                            if Some(*block_info_slot) != slot_processed_first {
+                                                error!(
+                                                    slot = block_info_slot,
+                                                    "failed to build block"
+                                                );
+                                            }
                                             blocks.pop_first();
                                         }
                                         _ => break,
