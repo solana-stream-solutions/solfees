@@ -53,7 +53,7 @@ use {
 
 const MAX_NUM_RECENT_SLOT_INFO: usize = 150;
 
-#[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
+#[derive(Debug, Serialize)]
 #[serde(deny_unknown_fields)]
 #[serde(untagged)]
 enum JsonrpcOutputArced {
@@ -61,7 +61,7 @@ enum JsonrpcOutputArced {
     Failure(JsonrpcFailure),
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 #[serde(deny_unknown_fields)]
 struct JsonrpcSuccessArced {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -70,16 +70,37 @@ struct JsonrpcSuccessArced {
     pub id: JsonrpcId,
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 #[serde(untagged)]
 enum JsonrcpValueArced {
     Value(JsonrcpValue),
     MaybeArcedValue(Option<Arc<JsonrcpValue>>),
+    RpcPrioritizationFee(Vec<RpcPrioritizationFee>),
+    SolfeesSlotsFrontend(Vec<SlotsSubscribeOutput>),
+    SolfeesSlots(Vec<SolfeesPrioritizationFee>),
 }
 
 impl From<Option<&Arc<JsonrcpValue>>> for JsonrcpValueArced {
     fn from(value: Option<&Arc<JsonrcpValue>>) -> Self {
         Self::MaybeArcedValue(value.cloned())
+    }
+}
+
+impl From<Vec<RpcPrioritizationFee>> for JsonrcpValueArced {
+    fn from(value: Vec<RpcPrioritizationFee>) -> Self {
+        Self::RpcPrioritizationFee(value)
+    }
+}
+
+impl From<Vec<SlotsSubscribeOutput>> for JsonrcpValueArced {
+    fn from(value: Vec<SlotsSubscribeOutput>) -> Self {
+        Self::SolfeesSlotsFrontend(value)
+    }
+}
+
+impl From<Vec<SolfeesPrioritizationFee>> for JsonrcpValueArced {
+    fn from(value: Vec<SolfeesPrioritizationFee>) -> Self {
+        Self::SolfeesSlots(value)
     }
 }
 
@@ -911,7 +932,7 @@ impl SolanaRpc {
                                             })
                                             .collect::<Vec<_>>();
 
-                                        Self::create_success2(jsonrpc, id, result)
+                                        Self::create_success(jsonrpc, id, result)
                                     }
                                     RpcRequest::Slot { jsonrpc, id, commitment, min_context_slot } => {
                                         let slot = match commitment {
@@ -932,13 +953,13 @@ impl SolanaRpc {
                                     RpcRequest::SolfeesSlots { jsonrpc, id, filter, frontend } => {
                                         let outputs = slots_info.values().map(|info| info.get_filtered(&filter));
                                         if frontend {
-                                            Self::create_success2(jsonrpc, id, outputs.collect::<Vec<_>>())
+                                            Self::create_success(jsonrpc, id, outputs.collect::<Vec<_>>())
                                         } else {
                                             match outputs
                                                 .map(SolfeesPrioritizationFee::try_from)
                                                 .collect::<Result<Vec<_>, JsonrpcError>>()
                                             {
-                                                Ok(outputs) => Self::create_success2(jsonrpc, id, outputs),
+                                                Ok(outputs) => Self::create_success(jsonrpc, id, outputs),
                                                 Err(error) => Self::create_failure(jsonrpc, id, error),
                                             }
                                         }
