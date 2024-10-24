@@ -77,6 +77,12 @@ enum JsonrcpValueArced {
     MaybeArcedValue(Option<Arc<JsonrcpValue>>),
 }
 
+impl From<Option<&Arc<JsonrcpValue>>> for JsonrcpValueArced {
+    fn from(value: Option<&Arc<JsonrcpValue>>) -> Self {
+        Self::MaybeArcedValue(value.cloned())
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SolanaRpcMode {
     Solana,
@@ -454,7 +460,7 @@ impl SolanaRpc {
                         Self::create_failure(call.jsonrpc, call.id, error)
                     } else {
                         let version = solana_version::Version::default();
-                        Self::create_success(
+                        Self::create_success2(
                             call.jsonrpc,
                             call.id,
                             RpcVersionInfo {
@@ -621,7 +627,7 @@ impl SolanaRpc {
                             }) {
                                 Ok(filter_new) => {
                                     filter = Some((call.id.clone(), filter_new));
-                                    Self::create_success(call.jsonrpc, call.id, "subscribed")
+                                    Self::create_success2(call.jsonrpc, call.id, "subscribed")
                                 },
                                 Err(error) => Self::create_failure(call.jsonrpc, call.id, error),
                             };
@@ -643,9 +649,9 @@ impl SolanaRpc {
                             StreamsUpdateMessage::Slot { info } => info.get_filtered(filter),
                         };
                         let message = if ws_frontend {
-                            Self::create_success(None, id.clone(), output)
+                            Self::create_success2(None, id.clone(), output)
                         } else {
-                            Self::create_success(None, id.clone(), SlotsSubscribeOutputSolana::from(output))
+                            Self::create_success2(None, id.clone(), SlotsSubscribeOutputSolana::from(output))
                         };
                         websocket_tx_message = Some(WebSocketMessage::Text(serde_json::to_string(&message).expect("failed to serialize")));
                     }
@@ -669,7 +675,19 @@ impl SolanaRpc {
         metrics::websockets_alive_dec(mode);
     }
 
-    fn create_success<R>(
+    fn create_success(
+        jsonrpc: Option<JsonrpcVersion>,
+        id: JsonrpcId,
+        value: impl Into<JsonrcpValueArced>,
+    ) -> JsonrpcOutputArced {
+        JsonrpcOutputArced::Success(JsonrpcSuccessArced {
+            jsonrpc,
+            result: value.into(),
+            id,
+        })
+    }
+
+    fn create_success2<R>(
         jsonrpc: Option<JsonrpcVersion>,
         id: JsonrpcId,
         result: R,
@@ -752,7 +770,7 @@ impl SolanaRpc {
 
         let epoch_schedule = EpochSchedule::custom(432_000, 432_000, false);
         let mut leader_schedule_map_solfees = HashMap::<Slot, Arc<JsonrcpValue>>::new();
-        let mut leader_schedule_map_rpc = HashMap::<Slot, Arc<HashMap<String, Vec<usize>>>>::new();
+        let mut leader_schedule_map_rpc = HashMap::<Slot, Arc<JsonrcpValue>>::new();
 
         loop {
             tokio::select! {
@@ -852,7 +870,7 @@ impl SolanaRpc {
                                             }
                                         }
 
-                                        Self::create_success(jsonrpc, id, RpcResponse {
+                                        Self::create_success2(jsonrpc, id, RpcResponse {
                                             context: RpcResponseContext::new(slot),
                                             value: RpcBlockhash {
                                                 blockhash: value.hash.to_string(),
@@ -862,12 +880,7 @@ impl SolanaRpc {
                                     }
                                     RpcRequest::LeaderSchedule { jsonrpc, id, slot, epoch, commitment, identity } => {
                                         if let Some(epoch) = epoch {
-                                            let value = leader_schedule_map_solfees.get(&epoch).cloned();
-                                            JsonrpcOutputArced::Success(JsonrpcSuccessArced {
-                                                jsonrpc,
-                                                result: JsonrcpValueArced::MaybeArcedValue(value),
-                                                id,
-                                            })
+                                            Self::create_success(jsonrpc, id, leader_schedule_map_solfees.get(&epoch))
                                         } else {
                                             let slot = slot.unwrap_or({
                                                 match commitment {
@@ -883,7 +896,7 @@ impl SolanaRpc {
                                                 if let Some(slots) = leader_schedule_map_rpc.get(&epoch).and_then(|m| m.get(&identity)) {
                                                     map.insert(identity, slots);
                                                 }
-                                                Self::create_success(jsonrpc, id, Some(&map))
+                                                Self::create_success2(jsonrpc, id, Some(&map))
                                             } else {
                                                 Self::create_success(jsonrpc, id, leader_schedule_map_rpc.get(&epoch))
                                             }
@@ -898,7 +911,7 @@ impl SolanaRpc {
                                             })
                                             .collect::<Vec<_>>();
 
-                                        Self::create_success(jsonrpc, id, result)
+                                        Self::create_success2(jsonrpc, id, result)
                                     }
                                     RpcRequest::Slot { jsonrpc, id, commitment, min_context_slot } => {
                                         let slot = match commitment {
@@ -914,18 +927,18 @@ impl SolanaRpc {
                                             }
                                         }
 
-                                        Self::create_success(jsonrpc, id, slot)
+                                        Self::create_success2(jsonrpc, id, slot)
                                     }
                                     RpcRequest::SolfeesSlots { jsonrpc, id, filter, frontend } => {
                                         let outputs = slots_info.values().map(|info| info.get_filtered(&filter));
                                         if frontend {
-                                            Self::create_success(jsonrpc, id, outputs.collect::<Vec<_>>())
+                                            Self::create_success2(jsonrpc, id, outputs.collect::<Vec<_>>())
                                         } else {
                                             match outputs
                                                 .map(SolfeesPrioritizationFee::try_from)
                                                 .collect::<Result<Vec<_>, JsonrpcError>>()
                                             {
-                                                Ok(outputs) => Self::create_success(jsonrpc, id, outputs),
+                                                Ok(outputs) => Self::create_success2(jsonrpc, id, outputs),
                                                 Err(error) => Self::create_failure(jsonrpc, id, error),
                                             }
                                         }
