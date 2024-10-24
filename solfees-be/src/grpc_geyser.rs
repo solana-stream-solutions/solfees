@@ -388,16 +388,17 @@ where
                                         Some((block_info_slot, block_info))
                                             if *block_info_slot < info.slot =>
                                         {
-                                            if Some(*block_info_slot) != slot_processed_first {
-                                                error!(
-                                                    slot = block_info_slot,
-                                                    executed_transaction_count = ?block_info
-                                                        .meta
-                                                        .as_ref()
-                                                        .map(|m| m.executed_transaction_count),
-                                                    transactions = block_info.transactions.len(),
-                                                    "failed to build block"
-                                                );
+                                            if let Some(meta) = &block_info.meta {
+                                                if Some(*block_info_slot) != slot_processed_first {
+                                                    error!(
+                                                        slot = block_info_slot,
+                                                        executed_transaction_count =
+                                                            meta.executed_transaction_count,
+                                                        transactions =
+                                                            block_info.transactions.len(),
+                                                        "failed to build block"
+                                                    );
+                                                }
                                             }
                                             blocks.pop_first();
                                         }
