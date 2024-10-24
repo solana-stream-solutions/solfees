@@ -34,7 +34,7 @@ use {
         metadata::{errors::InvalidMetadataValue, AsciiMetadataValue},
         transport::channel::ClientTlsConfig,
     },
-    tracing::error,
+    tracing::{error, info},
     yellowstone_grpc_client::GeyserGrpcClient,
     yellowstone_grpc_proto::prelude::{
         self as proto, subscribe_update::UpdateOneof, SubscribeRequest,
@@ -380,6 +380,7 @@ where
                             if commitment == CommitmentLevel::Processed {
                                 if slot_processed_first.is_none() {
                                     slot_processed_first = Some(info.slot);
+                                    info!(slot = info.slot, "received first processed slot");
                                 }
                             } else if commitment == CommitmentLevel::Finalized {
                                 loop {
@@ -390,7 +391,7 @@ where
                                             if Some(*block_info_slot) != slot_processed_first {
                                                 error!(
                                                     slot = block_info_slot,
-                                                    executed_transaction_count = block_info
+                                                    executed_transaction_count = ?block_info
                                                         .meta
                                                         .as_ref()
                                                         .map(|m| m.executed_transaction_count),
