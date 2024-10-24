@@ -21,5 +21,6 @@ The minor version will be incremented upon a breaking change and the patch versi
 - api: use separate thread for WebSocket ([#5](https://github.com/solana-stream-solutions/solfees/pull/5))
 - api: fix getLatestBlockhash for rollback / lastValidBlockHeight ([#6](https://github.com/solana-stream-solutions/solfees/pull/6))
 - metrics: add requests queue size ([#7](https://github.com/solana-stream-solutions/solfees/pull/7))
+- api: optimize getLeaderSchedule ([#9](https://github.com/solana-stream-solutions/solfees/pull/9))
 
 ### Breaking
