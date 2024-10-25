@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { FunctionComponent } from "../common/types";
 import {
   CSSProperties,

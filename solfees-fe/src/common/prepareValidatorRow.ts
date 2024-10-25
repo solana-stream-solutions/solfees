@@ -1,10 +1,15 @@
 import { CommitmentStatus, SlotContent } from "../store/websocketStore.ts";
 
-export type CustomRow = {
+export type ExtendedCommitmentStatus = CommitmentStatus | "next-leader" | "scheduled";
+type ExtendedSlotContent = Omit<SlotContent, "commitment"> & {
+  commitment: ExtendedCommitmentStatus;
+};
+
+export type CustomRowBasic = {
   id: string;
   leader: string;
   slots: {
-    commitment: CommitmentStatus;
+    commitment: ExtendedCommitmentStatus;
     slot: number;
   }[];
   transactions: {
@@ -22,15 +27,18 @@ export type CustomRow = {
   fee1: number[];
   fee2: number[];
 };
+export type CustomRow = Omit<CustomRowBasic, "slots"> & {
+  slots: { slot: number; commitment: ExtendedCommitmentStatus }[];
+};
 type FxType = (arg: [id: string, slots: SlotContent[]]) => CustomRow;
 
-const getFakeSlot = (leader: string, newSlotId: number): SlotContent => ({
+export const getFakeSlot = (leader: string, newSlotId: number): ExtendedSlotContent => ({
   leader,
   slot: newSlotId,
   totalTransactionsFiltered: 0,
   feeLevels: [0, 0, 0],
   feeAverage: 0,
-  commitment: "fake" as "confirmed",
+  commitment: "scheduled",
   totalUnitsConsumed: 0,
   totalFee: 0,
   hash: "",
@@ -40,7 +48,7 @@ const getFakeSlot = (leader: string, newSlotId: number): SlotContent => ({
   time: 0,
 });
 
-function fillGaps(list: SlotContent[]): SlotContent[] {
+function fillGaps(list: SlotContent[]): ExtendedSlotContent[] {
   if (!list.length) return list;
   if (list.length === 4) return list;
   const groupIdx = ((list?.[0]?.slot || 0) / 4) | 0;
@@ -51,7 +59,7 @@ function fillGaps(list: SlotContent[]): SlotContent[] {
   const isFourth = list.find((elt) => (elt.slot / 4) % 1 === 0.75);
 
   const newLeader = list?.[0]?.leader || "UNKNOWN";
-  const newList: typeof list = [];
+  const newList: ExtendedSlotContent[] = [];
   isFirst ? newList.push({ ...isFirst }) : newList.push(getFakeSlot(newLeader, groupIdx * 4));
   isSecond ? newList.push({ ...isSecond }) : newList.push(getFakeSlot(newLeader, groupIdx * 4 + 1));
   isThird ? newList.push({ ...isThird }) : newList.push(getFakeSlot(newLeader, groupIdx * 4 + 2));
@@ -66,6 +74,13 @@ function fillGaps(list: SlotContent[]): SlotContent[] {
 export const prepareValidatorRow: FxType = ([id, rawSlots]) => {
   const slots = fillGaps(rawSlots);
   const leader = slots[0]?.leader || "UNKNOWN";
+  return prepareSingeRow(id, leader, slots);
+};
+export function prepareSingeRow(
+  id: string,
+  leader: string,
+  slots: ExtendedSlotContent[]
+): CustomRow {
   return {
     id,
     leader,
@@ -97,4 +112,4 @@ export const prepareValidatorRow: FxType = ([id, rawSlots]) => {
     fee1: slots.map((elt) => elt.feeLevels[1] || 0),
     fee2: slots.map((elt) => elt.feeLevels[2] || 0),
   };
-};
+}

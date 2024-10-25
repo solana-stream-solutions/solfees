@@ -22,10 +22,15 @@ import { percentFromStore } from "../common/utils.ts";
 import { ModalFee } from "../components/ui/ModalFee.tsx";
 import { Footer } from "../components/layout/Footer.tsx";
 import { PlotLayer } from "../components/layout/PlotLayer.tsx";
-import { prepareValidatorRow } from "../common/prepareValidatorRow.ts";
+import {
+  getFakeSlot,
+  prepareSingeRow,
+  prepareValidatorRow,
+} from "../common/prepareValidatorRow.ts";
 import { EarnedSol } from "../components/ui/EarnedSol.tsx";
-import { NextSlotInformer } from "../components/layout/NextSlotInformer.tsx";
 import { TransactionsHeaderButton } from "../components/ui/TransactionsHeaderButton.tsx";
+import { useScheduleStore } from "../store/scheduleStore.ts";
+import { useShallow } from "zustand/react/shallow";
 
 const ButtonWithTooltip = withTooltip({ content: "Top Tooltip" })(Button);
 
@@ -48,8 +53,10 @@ type TableProps = {
 };
 
 const CustomTable = ({ onEditFee, onEditKeys }: TableProps) => {
-  const slots2 = useWebSocketStore((state) => state.slots2);
-  const percents = useWebSocketStore((state) => state.percents);
+  const slots2 = useWebSocketStore(useShallow((state) => state.slots2));
+  const percents = useWebSocketStore(useShallow((state) => state.percents));
+  const indices = useScheduleStore(useShallow((state) => state.indices));
+  const leaders = useScheduleStore(useShallow((state) => state.leaders));
 
   const memoFee0 = useCallback(() => onEditFee(0), [onEditFee]);
   const memoFee1 = useCallback(() => onEditFee(1), [onEditFee]);
@@ -60,8 +67,21 @@ const CustomTable = ({ onEditFee, onEditKeys }: TableProps) => {
     const result = Object.entries(unsorted)
       .sort((a, b) => Number(a[0]) - Number(b[0]))
       .map(prepareValidatorRow);
+    // we always add next leader, but pick only one slot for it
+    const idx = Math.max(...Object.keys(slots2).map(Number));
+    const lastSlot = slots2[idx]?.[0]?.slot || 0;
+    if (lastSlot) {
+      const nextSlotNumber = (((lastSlot / 4) | 0) + 1) * 4;
+      const nextLeaderIndex = indices[nextSlotNumber % 432_000] || 0;
+      const nextLeader = leaders[nextLeaderIndex] || "";
+
+      const nextSlotContent = getFakeSlot(nextLeader, nextSlotNumber);
+      nextSlotContent.commitment = "next-leader";
+      const nextRow = prepareSingeRow(`scheduled-${nextSlotNumber}`, nextLeader, [nextSlotContent]);
+      result.push(nextRow);
+    }
     return [...result].reverse();
-  }, [slots2]);
+  }, [slots2, indices, leaders]);
 
   const columns: TableColumn<(typeof rowsFromSocket2)[number]>[] = useMemo(() => {
     return [
@@ -69,7 +89,7 @@ const CustomTable = ({ onEditFee, onEditKeys }: TableProps) => {
         minWidth: 150,
         title: "Validator",
         accessor: "leader",
-        renderCell: ({ row }) => <Validator leader={row.leader} />,
+        renderCell: ({ row }) => <Validator slots={row.slots} leader={row.leader} />,
       },
       {
         minWidth: 170,
@@ -86,7 +106,7 @@ const CustomTable = ({ onEditFee, onEditKeys }: TableProps) => {
             {title}
           </HeaderDataCell>
         ),
-        renderCell: ({ row }) => <Transactions items={row.transactions} />,
+        renderCell: ({ row }) => <Transactions slots={row.slots} items={row.transactions} />,
       },
       {
         title: "Compute Units",
@@ -99,7 +119,7 @@ const CustomTable = ({ onEditFee, onEditKeys }: TableProps) => {
             {title}
           </HeaderDataCell>
         ),
-        renderCell: ({ row }) => <ComputeUnits items={row.computeUnits} />,
+        renderCell: ({ row }) => <ComputeUnits slots={row.slots} items={row.computeUnits} />,
       },
       {
         minWidth: 160,
@@ -112,7 +132,7 @@ const CustomTable = ({ onEditFee, onEditKeys }: TableProps) => {
             {title}
           </HeaderDataCell>
         ),
-        renderCell: ({ row }) => <EarnedSol list={row.earnedSol} />,
+        renderCell: ({ row }) => <EarnedSol slots={row.slots} items={row.earnedSol} />,
       },
       {
         minWidth: 160,
@@ -126,7 +146,7 @@ const CustomTable = ({ onEditFee, onEditKeys }: TableProps) => {
             {title}
           </HeaderDataCell>
         ),
-        renderCell: ({ row }) => <SimpleCell list={row.averageFee} />,
+        renderCell: ({ row }) => <SimpleCell slots={row.slots} items={row.averageFee} />,
       },
       {
         minWidth: 160,
@@ -148,7 +168,7 @@ const CustomTable = ({ onEditFee, onEditKeys }: TableProps) => {
             {title}
           </HeaderDataCell>
         ),
-        renderCell: ({ row }) => <SimpleCell list={row.fee0} />,
+        renderCell: ({ row }) => <SimpleCell slots={row.slots} items={row.fee0} />,
       },
       {
         minWidth: 160,
@@ -170,7 +190,7 @@ const CustomTable = ({ onEditFee, onEditKeys }: TableProps) => {
             {title}
           </HeaderDataCell>
         ),
-        renderCell: ({ row }) => <SimpleCell list={row.fee1} />,
+        renderCell: ({ row }) => <SimpleCell slots={row.slots} items={row.fee1} />,
       },
       {
         minWidth: 160,
@@ -192,7 +212,7 @@ const CustomTable = ({ onEditFee, onEditKeys }: TableProps) => {
             {title}
           </HeaderDataCell>
         ),
-        renderCell: ({ row }) => <SimpleCell list={row.fee2} />,
+        renderCell: ({ row }) => <SimpleCell slots={row.slots} items={row.fee2} />,
       },
     ];
   }, [onEditKeys, percents, memoFee0, memoFee1, memoFee2]);
@@ -304,7 +324,6 @@ export const HomeNew = (): FunctionComponent => {
           <Epoch />
         </div>
         <PlotLayer />
-        <NextSlotInformer />
         <CustomTable onEditFee={setEditedFeeIdx} onEditKeys={filterModalControls.on} />
         <ModalFee
           editedFeeIdx={editedFeeIdx}

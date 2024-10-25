@@ -2,9 +2,11 @@ import { Text } from "@consta/uikit/Text";
 import { useWebSocketStore } from "../../store/websocketStore.ts";
 import { useShallow } from "zustand/react/shallow";
 import { CustomRow } from "../../common/prepareValidatorRow.ts";
+import { isReal } from "../../common/isReal.ts";
 
 interface Props {
   items: CustomRow["transactions"];
+  slots: CustomRow["slots"];
 }
 
 function buildTransactions(slots: CustomRow["transactions"], withFiltered = false) {
@@ -32,17 +34,21 @@ function buildTransactions(slots: CustomRow["transactions"], withFiltered = fals
   return alignedWithKeys;
 }
 
-export const Transactions = ({ items }: Props) => {
+export const Transactions = ({ items, slots }: Props) => {
   const hasRW = useWebSocketStore(useShallow((state) => !!state.readwriteKeys.length));
   const hasRO = useWebSocketStore(useShallow((state) => !!state.readonlyKeys.length));
 
   return (
     <div className="px-3 text-right">
-      {buildTransactions(items, hasRO || hasRW).map((elt) => (
-        <Text key={elt.key} font="mono" className="whitespace-pre">
-          {elt.value}
-        </Text>
-      ))}
+      {buildTransactions(items, hasRO || hasRW).map((elt, idx) => {
+        const currentSlot = slots[idx];
+        const isFilled = currentSlot ? isReal(currentSlot) : false;
+        return (
+          <Text key={elt.key} font="mono" className="whitespace-pre">
+            {isFilled ? elt.value : " "}
+          </Text>
+        );
+      })}
     </div>
   );
 };

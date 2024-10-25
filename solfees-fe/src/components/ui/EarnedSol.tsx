@@ -1,8 +1,10 @@
 import { Text } from "@consta/uikit/Text";
 import { CustomRow } from "../../common/prepareValidatorRow.ts";
+import { isReal } from "../../common/isReal.ts";
 
 interface Props {
-  list: CustomRow["earnedSol"];
+  items: CustomRow["earnedSol"];
+  slots: CustomRow["slots"];
 }
 
 function formatValue(value: number): string {
@@ -15,14 +17,19 @@ function formatValue(value: number): string {
         .replace(/\s/g, "")
     : value.toFixed(9);
 }
-export const EarnedSol = ({ list }: Props) => {
+export const EarnedSol = ({ items, slots }: Props) => {
   return (
     <div className="px-3 text-right">
-      {list.map((elt, idx) => (
-        <Text key={idx} font="mono">
-          {formatValue(elt)}
-        </Text>
-      ))}
+      {items.map((elt, idx) => {
+        const currentSlot = slots[idx];
+        const isFilled = currentSlot ? isReal(currentSlot) : false;
+
+        return (
+          <Text key={idx} font="mono" className="whitespace-pre">
+            {isFilled ? formatValue(elt) : " "}
+          </Text>
+        );
+      })}
     </div>
   );
 };

@@ -1,9 +1,11 @@
 import { Text } from "@consta/uikit/Text";
 import { CustomRow } from "../../common/prepareValidatorRow.ts";
 import { withTooltip } from "@consta/uikit/withTooltip";
+import { isReal } from "../../common/isReal.ts";
 
 interface Props {
   items: CustomRow["computeUnits"];
+  slots: CustomRow["slots"];
 }
 
 const TextWithTooltip = withTooltip({ content: "Top tooltip" })(Text);
@@ -26,25 +28,39 @@ const amountFormatter = (amount: number): string => {
   return result;
 };
 
-export const ComputeUnits = ({ items }: Props) => {
+export const ComputeUnits = ({ items, slots }: Props) => {
   return (
     <div className="px-3 min-w-0">
-      {items.map((elt, idx) => (
-        <div key={elt.amount === 0 ? idx : elt.amount} className="flex justify-end">
-          <TextWithTooltip
-            className="flex justify-end text-right gap-1 shrink-0"
-            tooltipProps={{
-              content: tooltipFormatter.format(elt.amount),
-              direction: "leftCenter",
-              appearTimeout: 0,
-              exitTimeout: 0,
-            }}
+      {items.map((elt, idx) => {
+        const currentSlot = slots[idx];
+        const isFilled = currentSlot ? isReal(currentSlot) : false;
+
+        return (
+          <div
+            key={elt.amount === 0 ? idx : elt.amount}
+            className="flex justify-end whitespace-pre"
           >
-            <Text font="mono">{amountFormatter(elt.amount)}</Text>
-            <Text font="mono">({percentFormatter.format(elt.percent).replace(/,/g, " ")})</Text>
-          </TextWithTooltip>
-        </div>
-      ))}
+            {isFilled ? (
+              <TextWithTooltip
+                className="flex justify-end text-right gap-1 shrink-0"
+                tooltipProps={{
+                  content: tooltipFormatter.format(elt.amount),
+                  direction: "leftCenter",
+                  appearTimeout: 0,
+                  exitTimeout: 0,
+                }}
+              >
+                <Text font="mono">{amountFormatter(elt.amount)}</Text>
+                <Text font="mono">({percentFormatter.format(elt.percent).replace(/,/g, " ")})</Text>
+              </TextWithTooltip>
+            ) : (
+              <Text font="mono" className="flex-shrink-0">
+                {" "}
+              </Text>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 };

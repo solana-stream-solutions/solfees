@@ -9,21 +9,26 @@ import { IconCopy } from "@consta/icons/IconCopy";
 import { IconWarning } from "@consta/icons/IconWarning";
 import { IconProcessing } from "@consta/icons/IconProcessing";
 import { IconWatchStroked } from "@consta/icons/IconWatchStroked";
+import { CustomRow, ExtendedCommitmentStatus } from "../../common/prepareValidatorRow.ts";
+import { IconLoading } from "@consta/icons/IconLoading";
 
 interface Props {
-  items: {
-    commitment: CommitmentStatus;
-    slot: number;
-  }[];
+  items: CustomRow["slots"];
 }
 
 type ComProps = {
-  value: CommitmentStatus;
+  value: CustomRow["slots"][number]["commitment"];
 };
 
-const statuses: (CommitmentStatus | "fake")[] = ["processed", "confirmed", "finalized", "fake"];
-const colors: IconPropView[] = ["link", "primary", "success", "ghost"];
-const icons = [IconProcessing, IconCheck, IconAllDone, IconWatchStroked];
+const statuses: ExtendedCommitmentStatus[] = [
+  "processed",
+  "confirmed",
+  "finalized",
+  "scheduled",
+  "next-leader",
+];
+const colors: IconPropView[] = ["link", "primary", "success", "ghost", "disabled"];
+const icons = [IconProcessing, IconCheck, IconAllDone, IconLoading, IconWatchStroked];
 export const AnimateIconBaseIcons = ({ value }: ComProps) => {
   const idx = statuses.findIndex((elt) => elt === value);
   return (

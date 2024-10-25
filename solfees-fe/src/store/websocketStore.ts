@@ -77,7 +77,7 @@ export const useWebSocketStore = create<WebSocketState>((set, get: () => WebSock
 
             const slots2 = get().slots2;
             if (slots2[groupIdx]) {
-              slots2[groupIdx] = [...slots2[groupIdx], update]
+              slots2[groupIdx] = [...(slots2[groupIdx] as SlotContent[]), update]
                 .sort((a, b) => b.slot - a.slot)
                 .filter((elt, idx, arr) => {
                   // probably I have dupes because I enqueue a lot of stuff without filtering
@@ -85,7 +85,7 @@ export const useWebSocketStore = create<WebSocketState>((set, get: () => WebSock
                   return sameIdx === idx;
                 });
 
-              slots2[groupIdx] = [...slots2[groupIdx], update]
+              slots2[groupIdx] = [...(slots2[groupIdx] as SlotContent[]), update]
                 .sort((a, b) => b.slot - a.slot)
                 .filter((elt, idx, arr) => {
                   // probably I have dupes because I enqueue a lot of stuff without filtering
@@ -120,7 +120,7 @@ export const useWebSocketStore = create<WebSocketState>((set, get: () => WebSock
             }
             // test
 
-            const newSlots = slots2[groupIdx].map((elt) => {
+            const newSlots = (slots2[groupIdx] as SlotContent[]).map((elt) => {
               if (elt.slot === update.slot) return { ...elt, ...update };
               return elt;
             });
