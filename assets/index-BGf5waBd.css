@@ -568,6 +568,9 @@ video {
 .min-w-\[50\%\] {
   min-width: 50%;
 }
+.flex-shrink-0 {
+  flex-shrink: 0;
+}
 .shrink-0 {
   flex-shrink: 0;
 }

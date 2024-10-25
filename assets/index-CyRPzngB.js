@@ -12353,7 +12353,7 @@ const createIconInner = (a2, b2) => {
 const IconSortDownSizeM = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 24 24", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M3 18h6v-2H3v2zM3 6v2h18V6H3zm0 7h12v-2H3v2z" }));
 const IconSortDownSizeS = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 16 16", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M2 3h12v2H2V3zm0 4h8v2H2V7zm4 4H2v2h4v-2z" }));
 const IconSortDownSizeXs = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 12 12", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M11 3v1H1V3h10zM8 6v1H1V6h7zm-3 4V9H1v1h4z" }));
-const props$o = { l: IconSortDownSizeM, m: IconSortDownSizeM, s: IconSortDownSizeS, xs: IconSortDownSizeXs, name: "IconSortDown", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
+const props$p = { l: IconSortDownSizeM, m: IconSortDownSizeM, s: IconSortDownSizeS, xs: IconSortDownSizeXs, name: "IconSortDown", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
 reactExports.memo(({ element: a2, name: b2 }) => a2 ? React.createElement("svg", { key: cnIcons(b2) }, React.createElement("symbol", { id: `${cnIcons(b2)}` }, a2.props.children)) : null, ({ name: a2 }, { name: b2 }) => a2 === b2);
 const defaultContextValue = { addIcon: void 0, removeIcon: void 0 };
 const cnIcons = cn$1("Icons");
@@ -12368,20 +12368,20 @@ const createSvg = (a2) => (b2) => {
     "use" === e3[g2] && (null === k2 || void 0 === k2 ? void 0 : k2(d2, g2));
   }, [i, e3, g2]), j && "use" === e3[g2] ? React.createElement("svg", Object.assign({}, h2, o), React.createElement("use", { x: "0", y: "0", xlinkHref: `#${cnIcons(`${d2}_${g2}`)}` })) : React.createElement(i, { className: f2 });
 };
-const svg$o = createSvg(props$o);
-const IconSortDown = createIconInner(props$o, svg$o);
+const svg$p = createSvg(props$p);
+const IconSortDown = createIconInner(props$p, svg$p);
 const IconSortUpSizeM = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 24 24", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M3 8h6V6H3v2zm0 8v2h18v-2H3zm0-3h12v-2H3v2z" }));
 const IconSortUpSizeS = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 16 16", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M6 5H2V3h4v2zM2 7v2h8V7H2zm0 6h12v-2H2v2z" }));
 const IconSortUpSizeXs = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 12 12", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M5 3v1H1V3h4zm3 4V6H1v1h7zm3 3V9H1v1h10z" }));
-const props$n = { l: IconSortUpSizeM, m: IconSortUpSizeM, s: IconSortUpSizeS, xs: IconSortUpSizeXs, name: "IconSortUp", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
-const svg$n = createSvg(props$n);
-const IconSortUp = createIconInner(props$n, svg$n);
+const props$o = { l: IconSortUpSizeM, m: IconSortUpSizeM, s: IconSortUpSizeS, xs: IconSortUpSizeXs, name: "IconSortUp", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
+const svg$o = createSvg(props$o);
+const IconSortUp = createIconInner(props$o, svg$o);
 const IconUnsortSizeM = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 24 24", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M3 13h6v-2H3v2zm0-7v2h18V6H3zm0 12h12v-2H3v2z" }));
 const IconUnsortSizeS = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 16 16", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M2 3h12v2H2V3zm0 8h8v2H2v-2zm4-4H2v2h4V7z" }));
 const IconUnsortSizeXs = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 12 12", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M11 3v1H1V3h10zM8 9v1H1V9h7zM5 7V6H1v1h4z" }));
-const props$m = { l: IconUnsortSizeM, m: IconUnsortSizeM, s: IconUnsortSizeS, xs: IconUnsortSizeXs, name: "IconUnsort", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
-const svg$m = createSvg(props$m);
-const IconUnsort = createIconInner(props$m, svg$m);
+const props$n = { l: IconUnsortSizeM, m: IconUnsortSizeM, s: IconUnsortSizeS, xs: IconUnsortSizeXs, name: "IconUnsort", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
+const svg$n = createSvg(props$n);
+const IconUnsort = createIconInner(props$n, svg$n);
 var cnScrollBar = cn$2("MixScrollBar");
 var mixScrollBarPropSize = ["m", "xs", "s"];
 var mixScrollBarPropSizeDefault = mixScrollBarPropSize[0];
@@ -12808,9 +12808,9 @@ var useSelectedFilters = function(a2, b2) {
 const IconFunnelSizeM = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 24 24", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M22 2H2v2.24a2 2 0 0 0 .505 1.328l6.99 7.864A2 2 0 0 1 10 14.76V23l4-2v-6.24a2 2 0 0 1 .505-1.328l6.99-7.864A2 2 0 0 0 22 4.24V2z" }));
 const IconFunnelSizeS = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 16 16", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M14 2H2v1.276a2 2 0 0 0 .464 1.28l4.072 4.888A2 2 0 0 1 7 10.724V15l2-1v-3.276a2 2 0 0 1 .464-1.28l4.072-4.888A2 2 0 0 0 14 3.276V2z" }));
 const IconFunnelSizeXs = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 12 12", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M11 2H1v.586a1 1 0 0 0 .293.707l3.414 3.414A1 1 0 0 1 5 7.414V11l2-1V7.414a1 1 0 0 1 .293-.707l3.414-3.414A1 1 0 0 0 11 2.586V2z" }));
-const props$l = { l: IconFunnelSizeM, m: IconFunnelSizeM, s: IconFunnelSizeS, xs: IconFunnelSizeXs, name: "IconFunnel", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
-const svg$l = createSvg(props$l);
-const IconFunnel = createIconInner(props$l, svg$l);
+const props$m = { l: IconFunnelSizeM, m: IconFunnelSizeM, s: IconFunnelSizeS, xs: IconFunnelSizeXs, name: "IconFunnel", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
+const svg$m = createSvg(props$m);
+const IconFunnel = createIconInner(props$m, svg$m);
 function _extends$u() {
   return _extends$u = Object.assign ? Object.assign.bind() : function(n2) {
     for (var e3 = 1; e3 < arguments.length; e3++) {
@@ -13848,15 +13848,15 @@ var TableResizer = function(a2) {
 const IconArrowDownSizeM = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 24 24", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M16.59 8.59 12 13.17 7.41 8.59 6 10l6 6 6-6-1.41-1.41Z" }));
 const IconArrowDownSizeS = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 16 16", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { fillRule: "evenodd", clipRule: "evenodd", d: "M8 9.593 3.703 5.296 2.289 6.71 8 12.421l5.711-5.711-1.414-1.414L8 9.593Z" }));
 const IconArrowDownSizeXs = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 12 12", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { fillRule: "evenodd", clipRule: "evenodd", d: "M6.005 8.341 2.03 4.366l.707-.707 3.268 3.268 3.268-3.268.707.707-3.975 3.975Z" }));
-const props$k = { l: IconArrowDownSizeM, m: IconArrowDownSizeM, s: IconArrowDownSizeS, xs: IconArrowDownSizeXs, name: "IconArrowDown", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
-const svg$k = createSvg(props$k);
-const IconArrowDown = createIconInner(props$k, svg$k);
+const props$l = { l: IconArrowDownSizeM, m: IconArrowDownSizeM, s: IconArrowDownSizeS, xs: IconArrowDownSizeXs, name: "IconArrowDown", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
+const svg$l = createSvg(props$l);
+const IconArrowDown = createIconInner(props$l, svg$l);
 const IconArrowUpSizeM = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 24 24", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "m12 8-6 6 1.41 1.41L12 10.83l4.59 4.58L18 14l-6-6Z" }));
 const IconArrowUpSizeS = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 16 16", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { fillRule: "evenodd", clipRule: "evenodd", d: "m8 6.406-4.297 4.297-1.414-1.414L8 3.577l5.711 5.712-1.414 1.414L8 6.406Z" }));
 const IconArrowUpSizeXs = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 12 12", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { fillRule: "evenodd", clipRule: "evenodd", d: "M6.005 3.66 9.98 7.633l-.707.707-3.268-3.268-3.268 3.268-.707-.707 3.975-3.975Z" }));
-const props$j = { l: IconArrowUpSizeM, m: IconArrowUpSizeM, s: IconArrowUpSizeS, xs: IconArrowUpSizeXs, name: "IconArrowUp", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
-const svg$j = createSvg(props$j);
-const IconArrowUp = createIconInner(props$j, svg$j);
+const props$k = { l: IconArrowUpSizeM, m: IconArrowUpSizeM, s: IconArrowUpSizeS, xs: IconArrowUpSizeXs, name: "IconArrowUp", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
+const svg$k = createSvg(props$k);
+const IconArrowUp = createIconInner(props$k, svg$k);
 var cnTableRowsCollapse = cn$2("TableRowsCollapse");
 var TableRowsCollapse = function(a2) {
   var b2 = a2.level, c2 = a2.children, d2 = a2.isExpanded, e3 = a2.toggleCollapse, f2 = a2.withCollapseButton, g2 = a2.isExpandedByDefault;
@@ -13865,9 +13865,9 @@ var TableRowsCollapse = function(a2) {
 const IconCloseSizeM = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 24 24", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "m12 13.414 7.778 7.778 1.414-1.414L13.414 12l7.778-7.778-1.414-1.414L12 10.586 4.222 2.808 2.808 4.222 10.586 12l-7.778 7.778 1.414 1.414L12 13.414z" }));
 const IconCloseSizeS = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 16 16", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M3.757 2.343 2.343 3.757 6.586 8l-4.243 4.243 1.414 1.414L8 9.414l4.243 4.243 1.414-1.414L9.414 8l4.243-4.243-1.414-1.414L8 6.586 3.757 2.343z", fillRule: "evenodd", clipRule: "evenodd" }));
 const IconCloseSizeXs = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 12 12", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "m2.164 9.156.686.694L6 6.7l3.15 3.15.7-.7L6.7 6l3.15-3.15-.707-.707L6 5.3 2.85 2.15l-.701.699 3.152 3.152-3.138 3.154z" }));
-const props$i = { l: IconCloseSizeM, m: IconCloseSizeM, s: IconCloseSizeS, xs: IconCloseSizeXs, name: "IconClose", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
-const svg$i = createSvg(props$i);
-const IconClose = createIconInner(props$i, svg$i);
+const props$j = { l: IconCloseSizeM, m: IconCloseSizeM, s: IconCloseSizeS, xs: IconCloseSizeXs, name: "IconClose", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
+const svg$j = createSvg(props$j);
+const IconClose = createIconInner(props$j, svg$j);
 var _excluded$P = ["size", "as", "label", "className", "group", "view", "onCancel", "icon", "iconSize", "withAction"];
 var tagBasePropSize = ["m", "xs", "s", "l"];
 var tagBasePropSizeDefault = tagBasePropSize[0];
@@ -13914,9 +13914,9 @@ const IconSearchStrokedSizeL = (a2) => reactExports.createElement("svg", Object.
 const IconSearchStrokedSizeM = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 24 24", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { fillRule: "evenodd", clipRule: "evenodd", d: "M14.05 15.463a7.5 7.5 0 1 1 1.414-1.414l6.542 6.542-1.415 1.415-6.542-6.543ZM15 9.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0Z" }));
 const IconSearchStrokedSizeS = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 16 16", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { fillRule: "evenodd", clipRule: "evenodd", d: "M9.618 11.032a5.5 5.5 0 1 1 1.414-1.414l3.97 3.969L13.586 15l-3.97-3.97ZM10 6.5a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0Z" }));
 const IconSearchStrokedSizeXs = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 12 12", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { fillRule: "evenodd", clipRule: "evenodd", d: "M7.453 8.16a4 4 0 1 1 .707-.707l2.844 2.844-.707.707L7.453 8.16ZM8 5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" }));
-const props$h = { l: IconSearchStrokedSizeL, m: IconSearchStrokedSizeM, s: IconSearchStrokedSizeS, xs: IconSearchStrokedSizeXs, name: "IconSearchStroked", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
-const svg$h = createSvg(props$h);
-createIconInner(props$h, svg$h);
+const props$i = { l: IconSearchStrokedSizeL, m: IconSearchStrokedSizeM, s: IconSearchStrokedSizeS, xs: IconSearchStrokedSizeXs, name: "IconSearchStroked", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
+const svg$i = createSvg(props$i);
+createIconInner(props$i, svg$i);
 function _createForOfIteratorHelper$3(a2, b2) {
   var c2 = "undefined" != typeof Symbol && a2[Symbol.iterator] || a2["@@iterator"];
   if (!c2) {
@@ -14093,27 +14093,27 @@ reactExports.forwardRef(CheckboxGroupRender);
 const IconClearSizeM = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 24 24", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { fillRule: "evenodd", clipRule: "evenodd", d: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM7.297 7.297a1 1 0 0 0 0 1.414L10.586 12l-3.294 3.294a1 1 0 1 0 1.414 1.414L12 13.414l3.293 3.293a1 1 0 0 0 1.415-1.414L13.414 12l3.29-3.289a1 1 0 0 0-1.415-1.414L12 10.586l-3.289-3.29a1 1 0 0 0-1.414 0Z" }));
 const IconClearSizeS = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 16 16", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { fillRule: "evenodd", clipRule: "evenodd", d: "M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14Zm0-8.273 2.466-2.467a.9.9 0 0 1 1.273 1.273L9.271 8.001l2.466 2.469a.9.9 0 1 1-1.272 1.273L8 9.275l-2.464 2.468a.9.9 0 1 1-1.273-1.273l2.465-2.469-2.465-2.468A.9.9 0 0 1 5.536 4.26L8 6.727Z" }));
 const IconClearSizeXs = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 12 12", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { fillRule: "evenodd", clipRule: "evenodd", d: "M6 11A5 5 0 1 0 6 1a5 5 0 0 0 0 10ZM3.177 8.819c.237.236.62.236.857 0l1.964-1.964 1.968 1.968a.606.606 0 0 0 .857-.856L6.854 5.999l1.967-1.966a.605.605 0 1 0-.857-.856L5.998 5.143 4.034 3.179a.606.606 0 0 0-.857.856L5.142 6 3.177 7.963a.605.605 0 0 0 0 .856Z" }));
-const props$g = { l: IconClearSizeM, m: IconClearSizeM, s: IconClearSizeS, xs: IconClearSizeXs, name: "IconClear", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
-const svg$g = createSvg(props$g);
-const IconClear = createIconInner(props$g, svg$g);
+const props$h = { l: IconClearSizeM, m: IconClearSizeM, s: IconClearSizeS, xs: IconClearSizeXs, name: "IconClear", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
+const svg$h = createSvg(props$h);
+const IconClear = createIconInner(props$h, svg$h);
 const IconEyeSizeM = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 24 24", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" }));
 const IconEyeSizeS = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 16 16", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M8 3C4.364 3 1.258 5.28 0 8.5 1.258 11.72 4.364 14 8 14s6.742-2.28 8-5.5C14.742 5.28 11.636 3 8 3zm0 9.167c-2.007 0-3.636-1.643-3.636-3.667S5.993 4.833 8 4.833s3.636 1.643 3.636 3.667S10.007 12.167 8 12.167zM8 6.3a2.188 2.188 0 0 0-2.182 2.2c0 1.217.975 2.2 2.182 2.2a2.188 2.188 0 0 0 2.182-2.2c0-1.217-.975-2.2-2.182-2.2z" }));
 const IconEyeSizeXs = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 12 12", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M6 2C3.273 2 .944 3.659 0 6c.944 2.341 3.273 4 6 4s5.056-1.659 6-4c-.944-2.341-3.273-4-6-4zm0 6.667C4.495 8.667 3.273 7.472 3.273 6c0-1.472 1.222-2.667 2.727-2.667S8.727 4.528 8.727 6c0 1.472-1.222 2.667-2.727 2.667zM6 4.4c-.905 0-1.636.715-1.636 1.6 0 .885.73 1.6 1.636 1.6.905 0 1.636-.715 1.636-1.6 0-.885-.73-1.6-1.636-1.6z" }));
-const props$f = { l: IconEyeSizeM, m: IconEyeSizeM, s: IconEyeSizeS, xs: IconEyeSizeXs, name: "IconEye", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
-const svg$f = createSvg(props$f);
-const IconEye = createIconInner(props$f, svg$f);
+const props$g = { l: IconEyeSizeM, m: IconEyeSizeM, s: IconEyeSizeS, xs: IconEyeSizeXs, name: "IconEye", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
+const svg$g = createSvg(props$g);
+const IconEye = createIconInner(props$g, svg$g);
 const IconEyeCloseSizeM = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 24 24", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { clipRule: "evenodd", d: "M1 12c1.73-4.39 6-7.5 11-7.5 2.389 0 4.611.71 6.47 1.93l-2.514 2.513A4.993 4.993 0 0 0 12 7c-2.76 0-5 2.24-5 5a4.99 4.99 0 0 0 1.943 3.956L6.67 18.23A11.886 11.886 0 0 1 1 12zm7.697 7.031c1.048.305 2.156.469 3.303.469 5 0 9.27-3.11 11-7.5a11.877 11.877 0 0 0-2.947-4.325l-3.184 3.184a5.002 5.002 0 0 1-6.01 6.01l-2.162 2.162zM9 12c0-1.66 1.34-3 3-3 .716 0 1.373.25 1.888.666l-4.214 4.232A2.99 2.99 0 0 1 9 12z" }), reactExports.createElement("path", { d: "m4.901 19.998-1.414-1.414L19.043 3.028l1.414 1.414z" }));
 const IconEyeCloseSizeS = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 16 16", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { clipRule: "evenodd", d: "M1.086 13.196 2.5 14.61l1.57-1.57.002.002 1.67-1.669-.003-.002 5.127-5.127.002.002L12.7 4.413V4.41l1.82-1.82-1.414-1.415-2.299 2.299A8.503 8.503 0 0 0 8 3C4.364 3 1.258 5.28 0 8.5a8.712 8.712 0 0 0 2.388 3.394l-1.302 1.302zm3.482-3.482 4.664-4.665A3.6 3.6 0 0 0 8 4.833c-2.007 0-3.636 1.643-3.636 3.667 0 .425.072.834.204 1.214zM8 14a8.5 8.5 0 0 1-2.948-.524l1.579-1.579c.423.174.885.27 1.369.27 2.007 0 3.636-1.643 3.636-3.667 0-.478-.09-.934-.255-1.352l2.129-2.13A8.712 8.712 0 0 1 16 8.5c-1.258 3.22-4.364 5.5-8 5.5z" }));
 const IconEyeCloseSizeXs = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 12 12", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { clipRule: "evenodd", d: "m1 9.485.707.707 8.485-8.485L9.485 1 8.132 2.353A6.557 6.557 0 0 0 6 2C3.273 2 .944 3.659 0 6a6.348 6.348 0 0 0 1.915 2.57L1 9.485zM3.475 7.01l3.5-3.5A2.773 2.773 0 0 0 6 3.332C4.495 3.333 3.273 4.528 3.273 6c0 .357.072.698.202 1.01zm4.987-2.158 1.51-1.51A6.353 6.353 0 0 1 12 6c-.944 2.341-3.273 4-6 4a6.55 6.55 0 0 1-2.28-.406l1.161-1.162c.342.15.72.235 1.119.235 1.505 0 2.727-1.195 2.727-2.667 0-.411-.095-.8-.265-1.148z" }));
-const props$e = { l: IconEyeCloseSizeM, m: IconEyeCloseSizeM, s: IconEyeCloseSizeS, xs: IconEyeCloseSizeXs, name: "IconEyeClose", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
-const svg$e = createSvg(props$e);
-const IconEyeClose = createIconInner(props$e, svg$e);
+const props$f = { l: IconEyeCloseSizeM, m: IconEyeCloseSizeM, s: IconEyeCloseSizeS, xs: IconEyeCloseSizeXs, name: "IconEyeClose", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
+const svg$f = createSvg(props$f);
+const IconEyeClose = createIconInner(props$f, svg$f);
 const IconSelectSizeM = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 24 24", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "m6.5 9 5.5 6 5.5-6h-11z" }));
 const IconSelectSizeS = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 16 16", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M3.5 5 8 10l4.5-5h-9z" }));
 const IconSelectSizeXs = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 12 12", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M6 8.5 10 4H2l4 4.5z" }));
-const props$d = { l: IconSelectSizeM, m: IconSelectSizeM, s: IconSelectSizeS, xs: IconSelectSizeXs, name: "IconSelect", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
-const svg$d = createSvg(props$d);
-const IconSelect = createIconInner(props$d, svg$d);
+const props$e = { l: IconSelectSizeM, m: IconSelectSizeM, s: IconSelectSizeS, xs: IconSelectSizeXs, name: "IconSelect", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
+const svg$e = createSvg(props$e);
+const IconSelect = createIconInner(props$e, svg$e);
 var index$1 = reactExports.useLayoutEffect;
 var useLatest = function useLatest2(value) {
   var ref = reactExports.useRef(value);
@@ -14733,21 +14733,21 @@ var Table$1 = React.forwardRef(InternalTable);
 const IconInfoCircleSizeM = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 24 24", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { fillRule: "evenodd", clipRule: "evenodd", d: "M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10Zm1.828-15.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0ZM9.479 11h1.644l-1.018 5.093a2.448 2.448 0 0 0 3.932 2.364l.042-.033c.473-.377.795-.913.907-1.508l.255-1.363h-2.034l-.187.994a.525.525 0 0 1-.189.314l-.041.033a.447.447 0 0 1-.719-.432l1.24-6.277A1 1 0 0 0 12.328 9H9.979l-.5 2Z" }));
 const IconInfoCircleSizeS = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 16 16", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { fillRule: "evenodd", clipRule: "evenodd", d: "M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14ZM9.292 4.072a1.072 1.072 0 1 1-2.144 0 1.072 1.072 0 0 1 2.144 0Zm-1.98 8.676a1.9 1.9 0 0 0 2.129-.164l.03-.023c.366-.293.615-.707.701-1.168l.183-.974a.15.15 0 0 0-.147-.177H8.753a.15.15 0 0 0-.147.122l-.133.71a.225.225 0 0 1-.081.135l-.03.024a.17.17 0 0 1-.273-.163l.858-4.153v-.003a.865.865 0 0 0-.85-1.024H6.418a.15.15 0 0 0-.145.113l-.357 1.43a.15.15 0 0 0 .145.186h.99l-.66 3.127-.001.003a1.9 1.9 0 0 0 .923 2Z" }));
 const IconInfoCircleSizeXs = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 12 12", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { fillRule: "evenodd", clipRule: "evenodd", d: "M6 11A5 5 0 1 0 6 1a5 5 0 0 0 0 10Zm1.203-8.27a.86.86 0 1 1-1.72 0 .86.86 0 0 1 1.72 0ZM4.802 4.284a.1.1 0 0 1 .097-.076h1.346a.673.673 0 0 1 .662.798v.001L6.218 8.34a.157.157 0 0 0 .251.15l.024-.019a.201.201 0 0 0 .072-.12l.107-.57a.1.1 0 0 1 .098-.081h1.167a.1.1 0 0 1 .098.118l-.147.781a1.548 1.548 0 0 1-.555.924l-.024.02a1.503 1.503 0 0 1-2.415-1.453v-.002l.536-2.532h-.819a.1.1 0 0 1-.097-.125l.287-1.146Z" }));
-const props$c = { l: IconInfoCircleSizeM, m: IconInfoCircleSizeM, s: IconInfoCircleSizeS, xs: IconInfoCircleSizeXs, name: "IconInfoCircle", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
-const svg$c = createSvg(props$c);
-const IconInfoCircle = createIconInner(props$c, svg$c);
+const props$d = { l: IconInfoCircleSizeM, m: IconInfoCircleSizeM, s: IconInfoCircleSizeS, xs: IconInfoCircleSizeXs, name: "IconInfoCircle", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
+const svg$d = createSvg(props$d);
+const IconInfoCircle = createIconInner(props$d, svg$d);
 const IconEditSizeM = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 24 24", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" }));
 const IconEditSizeS = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 16 16", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "m14 5-3-3-1.414 1.414 3 3L14 5zm-2.121 2.121-3-3L2 11v3h3l6.879-6.879z" }));
 const IconEditSizeXs = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 12 12", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M8.786 5.214 10 4 8 2 6.786 3.214l2 2zm-.572.572-2-2L2 8v2h2l4.214-4.214z" }));
-const props$b = { l: IconEditSizeM, m: IconEditSizeM, s: IconEditSizeS, xs: IconEditSizeXs, name: "IconEdit", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
-const svg$b = createSvg(props$b);
-const IconEdit = createIconInner(props$b, svg$b);
+const props$c = { l: IconEditSizeM, m: IconEditSizeM, s: IconEditSizeS, xs: IconEditSizeXs, name: "IconEdit", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
+const svg$c = createSvg(props$c);
+const IconEdit = createIconInner(props$c, svg$c);
 const IconAddSizeM = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 24 24", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M13 2h-2v9H2v2h9v9h2v-9h9v-2h-9V2z" }));
 const IconAddSizeS = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 16 16", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M9 2H7v5H2v2h5v5h2V9h5V7H9V2z" }));
 const IconAddSizeXs = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 12 12", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M6.5 2.5h-1v3h-3v1h3v3h1v-3h3v-1h-3v-3z" }));
-const props$a = { l: IconAddSizeM, m: IconAddSizeM, s: IconAddSizeS, xs: IconAddSizeXs, name: "IconAdd", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
-const svg$a = createSvg(props$a);
-const IconAdd = createIconInner(props$a, svg$a);
+const props$b = { l: IconAddSizeM, m: IconAddSizeM, s: IconAddSizeS, xs: IconAddSizeXs, name: "IconAdd", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
+const svg$b = createSvg(props$b);
+const IconAdd = createIconInner(props$b, svg$b);
 var cnMixPopoverArrow = cn$2("MixPopoverArrow");
 var tooltipPropSizes = ["m", "s", "l"];
 var tooltipPropSizesDefault = tooltipPropSizes[0];
@@ -14846,9 +14846,13 @@ function withTooltip(a2) {
     });
   };
 }
-const Validator = ({ leader }) => {
+const Validator = ({ leader, slots }) => {
+  const isNext = slots.some((elt) => elt.commitment === "next-leader");
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "px-3 w-full h-full flex flex-col flex-nowrap justify-center", children: [
-    /* @__PURE__ */ jsxRuntimeExports.jsx("h1", { className: "font-bold", children: "Validator Name:" }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("h1", { className: "font-bold", children: [
+      isNext ? "Next" : "",
+      " Validator Name:"
+    ] }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs(
       "a",
       {
@@ -14867,15 +14871,15 @@ const Validator = ({ leader }) => {
 const IconCheckSizeM = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 24 24", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { fillRule: "evenodd", clipRule: "evenodd", d: "M10.181 16.255 3.287 10.47 2 12.004l8.427 7.07 11.57-13.789L20.465 4 10.18 16.255z" }));
 const IconCheckSizeS = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 16 16", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { fillRule: "evenodd", clipRule: "evenodd", d: "M6.799 10.417 3.124 7.08 1.779 8.56l5.215 4.737 7.739-9.223-1.532-1.286-6.402 7.63z" }));
 const IconCheckSizeXs = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 12 12", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { fillRule: "evenodd", clipRule: "evenodd", d: "M4.606 8.794 1.46 5.93l-.674.74 3.916 3.564 6.12-7.293-.767-.643-5.45 6.496z" }));
-const props$9 = { l: IconCheckSizeM, m: IconCheckSizeM, s: IconCheckSizeS, xs: IconCheckSizeXs, name: "IconCheck", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
-const svg$9 = createSvg(props$9);
-const IconCheck = createIconInner(props$9, svg$9);
+const props$a = { l: IconCheckSizeM, m: IconCheckSizeM, s: IconCheckSizeS, xs: IconCheckSizeXs, name: "IconCheck", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
+const svg$a = createSvg(props$a);
+const IconCheck = createIconInner(props$a, svg$a);
 const IconAllDoneSizeM = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 24 24", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "m8.037 11.094-1.38 1.38 5.657 6.156L22.92 7.525l-1.414-1.414-9.192 9.689-4.277-4.706zM1 12.475l1.414-1.414.042.041 5.611 6.051-1.41 1.477L1 12.475z" }), reactExports.createElement("path", { d: "m12.215 12.81 5.049-5.285-1.415-1.414-5.109 5.109 1.475 1.59z" }));
 const IconAllDoneSizeS = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 16 16", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M1.414 6.5 0 7.914l4.243 4.746 1.404-1.499L1.414 6.5zm10.324-1.838-3.35 3.574-1.453-1.6 3.389-3.389 1.414 1.415z" }), reactExports.createElement("path", { d: "m4.243 7.914 1.312-1.312 2.93 3.228L14.6 3.281l1.38 1.38-7.495 7.999-4.242-4.746z" }));
 const IconAllDoneSizeXs = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 12 12", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("g", { clipPath: "url(#SvgIconAllDone_size_xs__a)" }, reactExports.createElement("path", { d: "m3.434 4.955-.606.606L6.364 9.6l5.657-6.16-.707-.708-4.95 5.448-2.93-3.225zM.673 4.888 0 5.56 3.535 9.6l.714-.772-3.576-3.94z" }), reactExports.createElement("path", { d: "m6.293 6.614 3.324-3.599-.708-.707-3.42 3.421.804.885z" })), reactExports.createElement("defs", null, reactExports.createElement("clipPath", { id: "SvgIconAllDone_size_xs__a" }, reactExports.createElement("path", { d: "M0 0h12v12H0z" }))));
-const props$8 = { l: IconAllDoneSizeM, m: IconAllDoneSizeM, s: IconAllDoneSizeS, xs: IconAllDoneSizeXs, name: "IconAllDone", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
-const svg$8 = createSvg(props$8);
-const IconAllDone = createIconInner(props$8, svg$8);
+const props$9 = { l: IconAllDoneSizeM, m: IconAllDoneSizeM, s: IconAllDoneSizeS, xs: IconAllDoneSizeXs, name: "IconAllDone", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
+const svg$9 = createSvg(props$9);
+const IconAllDone = createIconInner(props$9, svg$9);
 var isNotNumber = function(a2) {
   return "number" != typeof a2;
 };
@@ -14919,26 +14923,38 @@ const AnimateIconBase = forwardRefWithAs((a2, b2) => {
 const IconCopySizeM = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 24 24", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M8 3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v12a1.001 1.001 0 0 1-1 1h-3V7a1 1 0 0 0-1-1H8V3z" }), reactExports.createElement("path", { d: "M3 8a1 1 0 0 0-1 1v12a.996.996 0 0 0 1 1h12a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H3z" }));
 const IconCopySizeS = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 16 16", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M1 6a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V6z" }), reactExports.createElement("path", { d: "M6 1a1 1 0 0 0-1 1v1h7a1 1 0 0 1 1 1v7h1a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6z" }));
 const IconCopySizeXs = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 12 12", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M4 2a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H9V4a1 1 0 0 0-1-1H4V2z" }), reactExports.createElement("path", { d: "M2 4a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1H2z" }));
-const props$7 = { l: IconCopySizeM, m: IconCopySizeM, s: IconCopySizeS, xs: IconCopySizeXs, name: "IconCopy", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
-const svg$7 = createSvg(props$7);
-const IconCopy = createIconInner(props$7, svg$7);
+const props$8 = { l: IconCopySizeM, m: IconCopySizeM, s: IconCopySizeS, xs: IconCopySizeXs, name: "IconCopy", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
+const svg$8 = createSvg(props$8);
+const IconCopy = createIconInner(props$8, svg$8);
 const IconProcessingSizeL = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 28 28", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { fillRule: "evenodd", clipRule: "evenodd", d: "m17.525 17.255-2.109-.824a6.997 6.997 0 0 1-1.796 1.062l-.314 2.129a.447.447 0 0 1-.454.378h-3.7a.447.447 0 0 1-.454-.378l-.313-2.127a6.994 6.994 0 0 1-1.8-1.063l-2.106.823a.471.471 0 0 1-.564-.198l-1.85-3.114a.446.446 0 0 1 .11-.576l1.887-1.435a7.062 7.062 0 0 1 0-1.864L2.175 8.633a.436.436 0 0 1-.11-.576l1.85-3.114c.11-.198.351-.279.564-.198l2.106.823a6.994 6.994 0 0 1 1.8-1.063l.313-2.127A.447.447 0 0 1 9.152 2h3.7c.232 0 .426.162.454.378l.314 2.129a6.995 6.995 0 0 1 1.796 1.062l2.109-.824a.471.471 0 0 1 .564.198l1.85 3.114a.446.446 0 0 1-.11.576l-1.89 1.438a7.069 7.069 0 0 1 0 1.858l1.89 1.438a.446.446 0 0 1 .11.576l-1.85 3.114a.457.457 0 0 1-.564.198ZM11 14.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM22.045 16h-1.5l-.443 1.18a3.995 3.995 0 0 0-1.517.878l-1.245-.207-.75 1.299.801.974a4.01 4.01 0 0 0 0 1.752l-.801.974.75 1.3 1.245-.208c.43.396.946.699 1.517.877L20.545 26h1.5l.443-1.18a3.996 3.996 0 0 0 1.517-.878l1.245.207.75-1.299-.801-.974a4.017 4.017 0 0 0 0-1.752L26 19.15l-.75-1.3-1.245.208a3.996 3.996 0 0 0-1.517-.877L22.045 16Zm-.744 6.52a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" }));
 const IconProcessingSizeM = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 24 24", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("g", { fillRule: "evenodd", clipRule: "evenodd" }, reactExports.createElement("path", { d: "M9.568 2h-2l-.59 1.574a5.328 5.328 0 0 0-2.023 1.17l-1.66-.277-1 1.732 1.068 1.3a5.351 5.351 0 0 0 0 2.336l-1.068 1.299 1 1.732 1.66-.276a5.342 5.342 0 0 0 2.023 1.169l.59 1.574h2l.59-1.574a5.327 5.327 0 0 0 2.023-1.17l1.66.277 1-1.732-1.068-1.299a5.35 5.35 0 0 0 0-2.337L14.842 6.2l-1-1.732-1.66.276a5.327 5.327 0 0 0-2.023-1.168L9.569 2zm1.667 6.667a2.667 2.667 0 1 1-5.333 0 2.667 2.667 0 0 1 5.333 0z" }), reactExports.createElement("path", { d: "M15.902 11.333h1.333l.502 1.507c.59.18 1.12.492 1.56.901l1.557-.318.666 1.154-1.053 1.189a4.014 4.014 0 0 1 0 1.801l1.054 1.189-.667 1.155-1.557-.32c-.44.41-.97.723-1.56.902L17.235 22h-1.333l-.503-1.507a3.997 3.997 0 0 1-1.559-.901l-1.557.319-.667-1.155 1.054-1.189a4.013 4.013 0 0 1 0-1.801l-1.054-1.189.667-1.155 1.557.32c.44-.41.97-.722 1.56-.902l.502-1.507zm2 5.334a1.333 1.333 0 1 1-2.667 0 1.333 1.333 0 0 1 2.667 0z" })));
 const IconProcessingSizeS = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 16 16", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("g", { fillRule: "evenodd", clipRule: "evenodd" }, reactExports.createElement("path", { d: "M6.75 1h-1.5l-.443 1.18a3.996 3.996 0 0 0-1.517.878L2.045 2.85l-.75 1.3.801.974a4.014 4.014 0 0 0 0 1.752l-.801.974.75 1.3 1.245-.208c.43.396.946.699 1.517.877L5.25 11h1.5l.443-1.18a3.995 3.995 0 0 0 1.517-.878l1.245.208.75-1.3-.801-.974a4.014 4.014 0 0 0 0-1.752l.801-.974-.75-1.3-1.245.208a3.996 3.996 0 0 0-1.517-.877L6.75 1zM8 6a2 2 0 1 1-4 0 2 2 0 0 1 4 0z" }), reactExports.createElement("path", { d: "M11.5 8h1l.377 1.13c.441.135.84.369 1.17.676l1.167-.239.5.866-.79.891a3.008 3.008 0 0 1 0 1.351l.79.892-.5.866-1.168-.239c-.33.307-.728.541-1.17.676L12.5 16h-1l-.377-1.13a2.997 2.997 0 0 1-1.17-.676l-1.167.239-.5-.866.79-.891a3.01 3.01 0 0 1 0-1.352l-.79-.891.5-.866 1.168.239c.33-.307.728-.541 1.17-.676L11.5 8zm1.5 4a1 1 0 1 1-2 0 1 1 0 0 1 2 0z" })));
 const IconProcessingSizeXs = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 12 12", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { fillRule: "evenodd", clipRule: "evenodd", d: "M3.937.75h1.125l.333.886c.428.133.815.36 1.137.657l.934-.155.563.974-.601.73a3.01 3.01 0 0 1 0 1.315l.6.73-.562.975-.934-.155c-.322.297-.709.524-1.137.657l-.333.886H3.937l-.332-.886a2.997 2.997 0 0 1-1.137-.657l-.934.155-.563-.974.601-.73a3.01 3.01 0 0 1 0-1.315l-.6-.73.562-.975.934.155c.322-.297.709-.524 1.137-.657L3.937.75ZM4.5 6a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Zm4.875 0h-.75l-.283.848c-.33.1-.63.276-.877.506l-.876-.179-.375.65.593.668a2.257 2.257 0 0 0 0 1.014l-.593.668.375.65.876-.18c.247.23.546.406.877.507l.283.848h.75l.283-.848c.33-.1.63-.276.877-.506l.876.179.375-.65-.593-.668a2.255 2.255 0 0 0 0-1.014l.593-.668-.375-.65-.876.18a2.248 2.248 0 0 0-.877-.507L9.375 6ZM9 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" }));
-const props$6 = { l: IconProcessingSizeL, m: IconProcessingSizeM, s: IconProcessingSizeS, xs: IconProcessingSizeXs, name: "IconProcessing", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
-const svg$6 = createSvg(props$6);
-const IconProcessing = createIconInner(props$6, svg$6);
+const props$7 = { l: IconProcessingSizeL, m: IconProcessingSizeM, s: IconProcessingSizeS, xs: IconProcessingSizeXs, name: "IconProcessing", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
+const svg$7 = createSvg(props$7);
+const IconProcessing = createIconInner(props$7, svg$7);
 const IconWatchStrokedSizeL = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 28 28", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M15 14V7h-2v8.054l5.039 3.371 1.051-1.502L15 14Z" }), reactExports.createElement("path", { fillRule: "evenodd", clipRule: "evenodd", d: "M25 14c0 6.075-4.925 11-11 11S3 20.075 3 14 7.925 3 14 3s11 4.925 11 11Zm-2 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" }));
 const IconWatchStrokedSizeM = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 24 24", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M13 11.959V6h-2v7l5 3.5 1.147-1.639L13 11.96Z" }), reactExports.createElement("path", { fillRule: "evenodd", clipRule: "evenodd", d: "M22 12c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2s10 4.477 10 10Zm-2 0a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z" }));
 const IconWatchStrokedSizeS = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 16 16", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M9 7.5V3H7v5.541l4 2.669 1.147-1.639L9 7.5Z" }), reactExports.createElement("path", { fillRule: "evenodd", clipRule: "evenodd", d: "M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0Zm-2 0A6 6 0 1 1 2 8a6 6 0 0 1 12 0Z" }));
 const IconWatchStrokedSizeXs = (a2) => reactExports.createElement("svg", Object.assign({ xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M5 2h1v3.749l2.79 1.954-.573.82L5 6.268V2Z" }), reactExports.createElement("path", { fillRule: "evenodd", clipRule: "evenodd", d: "M12 6A6 6 0 1 1 0 6a6 6 0 0 1 12 0Zm-1 0A5 5 0 1 1 1 6a5 5 0 0 1 10 0Z" }));
-const props$5 = { l: IconWatchStrokedSizeL, m: IconWatchStrokedSizeM, s: IconWatchStrokedSizeS, xs: IconWatchStrokedSizeXs, name: "IconWatchStroked", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
+const props$6 = { l: IconWatchStrokedSizeL, m: IconWatchStrokedSizeM, s: IconWatchStrokedSizeS, xs: IconWatchStrokedSizeXs, name: "IconWatchStroked", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
+const svg$6 = createSvg(props$6);
+const IconWatchStroked = createIconInner(props$6, svg$6);
+const IconLoadingSizeM = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 24 24", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M14.2 3.79c.214-.8-.261-1.635-1.084-1.728A10 10 0 1 0 21.31 8.35c-.302-.77-1.231-1.014-1.949-.6-.717.414-.945 1.33-.693 2.12a6.999 6.999 0 0 1-10.93 7.684 7 7 0 0 1 4.594-12.546c.828.04 1.654-.418 1.868-1.218Z" }));
+const IconLoadingSizeS = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 16 16", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M9.549 2.219c.145-.542-.177-1.106-.733-1.171a7 7 0 1 0 5.688 4.365c-.207-.521-.835-.686-1.32-.405-.486.28-.641.9-.465 1.432a4.97 4.97 0 1 1-4.433-3.402c.56.032 1.118-.278 1.263-.82Z" }));
+const IconLoadingSizeXs = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 12 12", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M7.165 1.653c.071-.266-.087-.543-.36-.588a5 5 0 1 0 3.753 2.88c-.113-.252-.422-.333-.66-.195-.24.138-.319.443-.212.698a4 4 0 1 1-3.14-2.41c.273.037.547-.118.619-.385Z" }));
+const props$5 = { l: IconLoadingSizeM, m: IconLoadingSizeM, s: IconLoadingSizeS, xs: IconLoadingSizeXs, name: "IconLoading", renderType: { l: "use", m: "use", s: "use", xs: "use" }, color: "mono" };
 const svg$5 = createSvg(props$5);
-const IconWatchStroked = createIconInner(props$5, svg$5);
-const statuses = ["processed", "confirmed", "finalized", "fake"];
-const colors = ["link", "primary", "success", "ghost"];
-const icons$1 = [IconProcessing, IconCheck, IconAllDone, IconWatchStroked];
+const IconLoading = createIconInner(props$5, svg$5);
+const statuses = [
+  "processed",
+  "confirmed",
+  "finalized",
+  "scheduled",
+  "next-leader"
+];
+const colors = ["link", "primary", "success", "ghost", "disabled"];
+const icons$1 = [IconProcessing, IconCheck, IconAllDone, IconLoading, IconWatchStroked];
 const AnimateIconBaseIcons$1 = ({ value }) => {
   const idx = statuses.findIndex((elt) => elt === value);
   return /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -14997,6 +15013,9 @@ const Slots = ({ items: items2 }) => {
     elt.slot
   )) });
 };
+function isReal(slot) {
+  return slot.commitment !== "next-leader" && slot.commitment !== "scheduled";
+}
 const TextWithTooltip$1 = withTooltip({ content: "Top tooltip" })(Text$1);
 const percentFormatter = new Intl.NumberFormat("en-US", {
   style: "percent",
@@ -15013,30 +15032,45 @@ const amountFormatter = (amount) => {
   const result = divided.toFixed(3) + "M";
   return result;
 };
-const ComputeUnits = ({ items: items2 }) => {
-  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "px-3 min-w-0", children: items2.map((elt, idx) => /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex justify-end", children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
-    TextWithTooltip$1,
-    {
-      className: "flex justify-end text-right gap-1 shrink-0",
-      tooltipProps: {
-        content: tooltipFormatter.format(elt.amount),
-        direction: "leftCenter",
-        appearTimeout: 0,
-        exitTimeout: 0
+const ComputeUnits = ({ items: items2, slots }) => {
+  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "px-3 min-w-0", children: items2.map((elt, idx) => {
+    const currentSlot = slots[idx];
+    const isFilled = currentSlot ? isReal(currentSlot) : false;
+    return /* @__PURE__ */ jsxRuntimeExports.jsx(
+      "div",
+      {
+        className: "flex justify-end whitespace-pre",
+        children: isFilled ? /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          TextWithTooltip$1,
+          {
+            className: "flex justify-end text-right gap-1 shrink-0",
+            tooltipProps: {
+              content: tooltipFormatter.format(elt.amount),
+              direction: "leftCenter",
+              appearTimeout: 0,
+              exitTimeout: 0
+            },
+            children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(Text$1, { font: "mono", children: amountFormatter(elt.amount) }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs(Text$1, { font: "mono", children: [
+                "(",
+                percentFormatter.format(elt.percent).replace(/,/g, " "),
+                ")"
+              ] })
+            ]
+          }
+        ) : /* @__PURE__ */ jsxRuntimeExports.jsx(Text$1, { font: "mono", className: "flex-shrink-0", children: " " })
       },
-      children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx(Text$1, { font: "mono", children: amountFormatter(elt.amount) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs(Text$1, { font: "mono", children: [
-          "(",
-          percentFormatter.format(elt.percent).replace(/,/g, " "),
-          ")"
-        ] })
-      ]
-    }
-  ) }, elt.amount === 0 ? idx : elt.amount)) });
+      elt.amount === 0 ? idx : elt.amount
+    );
+  }) });
 };
-const SimpleCell = ({ list }) => {
-  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "px-3 text-right", children: list.map((elt, idx) => /* @__PURE__ */ jsxRuntimeExports.jsx(Text$1, { font: "mono", children: elt.toLocaleString("en-US", { maximumFractionDigits: 2 }) }, idx)) });
+const SimpleCell = ({ items: items2, slots }) => {
+  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "px-3 text-right", children: items2.map((elt, idx) => {
+    const currentSlot = slots[idx];
+    const isFilled = currentSlot ? isReal(currentSlot) : false;
+    return /* @__PURE__ */ jsxRuntimeExports.jsx(Text$1, { font: "mono", className: "whitespace-pre", children: isFilled ? elt.toLocaleString("en-US", { maximumFractionDigits: 2 }) : " " }, idx);
+  }) });
 };
 const useScheduleStore = create((set3, get3) => {
   let isRequested = false;
@@ -16567,10 +16601,14 @@ function buildTransactions(slots, withFiltered = false) {
   });
   return alignedWithKeys;
 }
-const Transactions = ({ items: items2 }) => {
+const Transactions = ({ items: items2, slots }) => {
   const hasRW = useWebSocketStore(useShallow((state) => !!state.readwriteKeys.length));
   const hasRO = useWebSocketStore(useShallow((state) => !!state.readonlyKeys.length));
-  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "px-3 text-right", children: buildTransactions(items2, hasRO || hasRW).map((elt) => /* @__PURE__ */ jsxRuntimeExports.jsx(Text$1, { font: "mono", className: "whitespace-pre", children: elt.value }, elt.key)) });
+  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "px-3 text-right", children: buildTransactions(items2, hasRO || hasRW).map((elt, idx) => {
+    const currentSlot = slots[idx];
+    const isFilled = currentSlot ? isReal(currentSlot) : false;
+    return /* @__PURE__ */ jsxRuntimeExports.jsx(Text$1, { font: "mono", className: "whitespace-pre", children: isFilled ? elt.value : " " }, elt.key);
+  }) });
 };
 const IconPlaySizeL = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 28 28", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { fillRule: "evenodd", clipRule: "evenodd", d: "M24.3 15.201a1.382 1.382 0 0 0 0-2.402L8.209 3.349C7.239 2.78 6 3.455 6 4.551v18.898c0 1.096 1.24 1.77 2.208 1.202L24.3 15.2Z" }));
 const IconPlaySizeM = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 24 24", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "m22.5 12-17 10V2l17 10Z" }));
@@ -40177,7 +40215,7 @@ const getFakeSlot = (leader, newSlotId) => ({
   totalTransactionsFiltered: 0,
   feeLevels: [0, 0, 0],
   feeAverage: 0,
-  commitment: "fake",
+  commitment: "scheduled",
   totalUnitsConsumed: 0,
   totalFee: 0,
   hash: "",
@@ -40209,6 +40247,9 @@ const prepareValidatorRow = ([id2, rawSlots]) => {
   var _a2;
   const slots = fillGaps(rawSlots);
   const leader = ((_a2 = slots[0]) == null ? void 0 : _a2.leader) || "UNKNOWN";
+  return prepareSingeRow(id2, leader, slots);
+};
+function prepareSingeRow(id2, leader, slots) {
   return {
     id: id2,
     leader,
@@ -40240,33 +40281,19 @@ const prepareValidatorRow = ([id2, rawSlots]) => {
     fee1: slots.map((elt) => elt.feeLevels[1] || 0),
     fee2: slots.map((elt) => elt.feeLevels[2] || 0)
   };
-};
+}
 function formatValue(value) {
   return value > 1 ? value.toLocaleString("unknown", {
     maximumFractionDigits: 9,
     minimumFractionDigits: 9
   }).replace(/\s/g, "") : value.toFixed(9);
 }
-const EarnedSol = ({ list }) => {
-  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "px-3 text-right", children: list.map((elt, idx) => /* @__PURE__ */ jsxRuntimeExports.jsx(Text$1, { font: "mono", children: formatValue(elt) }, idx)) });
-};
-const NextSlotInformer = () => {
-  const slots2 = useWebSocketStore(useShallow((state) => state.slots2));
-  const indices = useScheduleStore(useShallow((state) => state.indices));
-  const leaders = useScheduleStore(useShallow((state) => state.leaders));
-  const lastSlot = reactExports.useMemo(() => {
-    var _a2, _b2;
-    const idx = Math.max(...Object.keys(slots2).map(Number));
-    return ((_b2 = (_a2 = slots2[idx]) == null ? void 0 : _a2[0]) == null ? void 0 : _b2.slot) || 0;
-  }, [slots2]);
-  const groupIndex = indices[lastSlot % 432e3] || 0;
-  const nextLeader = leaders[groupIndex] || "";
-  const nextSlot = ((lastSlot / 4 | 0) + 1) * 4;
-  if (!lastSlot) return null;
-  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full flex flex-nowrap justify-center gap-4", children: [
-    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { children: nextLeader }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { children: nextSlot })
-  ] });
+const EarnedSol = ({ items: items2, slots }) => {
+  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "px-3 text-right", children: items2.map((elt, idx) => {
+    const currentSlot = slots[idx];
+    const isFilled = currentSlot ? isReal(currentSlot) : false;
+    return /* @__PURE__ */ jsxRuntimeExports.jsx(Text$1, { font: "mono", className: "whitespace-pre", children: isFilled ? formatValue(elt) : " " }, idx);
+  }) });
 };
 const IconArrowLeftSizeM = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 24 24", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { d: "M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12l4.58-4.59Z" }));
 const IconArrowLeftSizeS = (a2) => reactExports.createElement("svg", Object.assign({ viewBox: "0 0 16 16", xmlns: "http://www.w3.org/2000/svg" }, a2), reactExports.createElement("path", { fillRule: "evenodd", clipRule: "evenodd", d: "m6.407 8 4.297-4.297L9.29 2.289 3.579 8l5.71 5.711 1.415-1.414L6.407 8Z" }));
@@ -41030,23 +41057,37 @@ const InfoButton = (props2) => {
   );
 };
 const CustomTable = ({ onEditFee, onEditKeys }) => {
-  const slots2 = useWebSocketStore((state) => state.slots2);
-  const percents = useWebSocketStore((state) => state.percents);
+  const slots2 = useWebSocketStore(useShallow((state) => state.slots2));
+  const percents = useWebSocketStore(useShallow((state) => state.percents));
+  const indices = useScheduleStore(useShallow((state) => state.indices));
+  const leaders = useScheduleStore(useShallow((state) => state.leaders));
   const memoFee0 = reactExports.useCallback(() => onEditFee(0), [onEditFee]);
   const memoFee1 = reactExports.useCallback(() => onEditFee(1), [onEditFee]);
   const memoFee2 = reactExports.useCallback(() => onEditFee(2), [onEditFee]);
   const rowsFromSocket2 = reactExports.useMemo(() => {
+    var _a2, _b2;
     const unsorted = slots2;
     const result = Object.entries(unsorted).sort((a2, b2) => Number(a2[0]) - Number(b2[0])).map(prepareValidatorRow);
+    const idx = Math.max(...Object.keys(slots2).map(Number));
+    const lastSlot = ((_b2 = (_a2 = slots2[idx]) == null ? void 0 : _a2[0]) == null ? void 0 : _b2.slot) || 0;
+    if (lastSlot) {
+      const nextSlotNumber = ((lastSlot / 4 | 0) + 1) * 4;
+      const nextLeaderIndex = indices[nextSlotNumber % 432e3] || 0;
+      const nextLeader = leaders[nextLeaderIndex] || "";
+      const nextSlotContent = getFakeSlot(nextLeader, nextSlotNumber);
+      nextSlotContent.commitment = "next-leader";
+      const nextRow = prepareSingeRow(`scheduled-${nextSlotNumber}`, nextLeader, [nextSlotContent]);
+      result.push(nextRow);
+    }
     return [...result].reverse();
-  }, [slots2]);
+  }, [slots2, indices, leaders]);
   const columns = reactExports.useMemo(() => {
     return [
       {
         minWidth: 150,
         title: "Validator",
         accessor: "leader",
-        renderCell: ({ row }) => /* @__PURE__ */ jsxRuntimeExports.jsx(Validator, { leader: row.leader })
+        renderCell: ({ row }) => /* @__PURE__ */ jsxRuntimeExports.jsx(Validator, { slots: row.slots, leader: row.leader })
       },
       {
         minWidth: 170,
@@ -41059,7 +41100,7 @@ const CustomTable = ({ onEditFee, onEditKeys }) => {
         title: "Transactions",
         accessor: "transactions",
         renderHeaderCell: ({ title }) => /* @__PURE__ */ jsxRuntimeExports.jsx(HeaderDataCell, { controlRight: [/* @__PURE__ */ jsxRuntimeExports.jsx(TransactionsHeaderButton, { onEditKeys })], children: title }),
-        renderCell: ({ row }) => /* @__PURE__ */ jsxRuntimeExports.jsx(Transactions, { items: row.transactions })
+        renderCell: ({ row }) => /* @__PURE__ */ jsxRuntimeExports.jsx(Transactions, { slots: row.slots, items: row.transactions })
       },
       {
         title: "Compute Units",
@@ -41072,7 +41113,7 @@ const CustomTable = ({ onEditFee, onEditKeys }) => {
             children: title
           }
         ),
-        renderCell: ({ row }) => /* @__PURE__ */ jsxRuntimeExports.jsx(ComputeUnits, { items: row.computeUnits })
+        renderCell: ({ row }) => /* @__PURE__ */ jsxRuntimeExports.jsx(ComputeUnits, { slots: row.slots, items: row.computeUnits })
       },
       {
         minWidth: 160,
@@ -41085,7 +41126,7 @@ const CustomTable = ({ onEditFee, onEditKeys }) => {
             children: title
           }
         ),
-        renderCell: ({ row }) => /* @__PURE__ */ jsxRuntimeExports.jsx(EarnedSol, { list: row.earnedSol })
+        renderCell: ({ row }) => /* @__PURE__ */ jsxRuntimeExports.jsx(EarnedSol, { slots: row.slots, items: row.earnedSol })
       },
       {
         minWidth: 160,
@@ -41098,7 +41139,7 @@ const CustomTable = ({ onEditFee, onEditKeys }) => {
             children: title
           }
         ),
-        renderCell: ({ row }) => /* @__PURE__ */ jsxRuntimeExports.jsx(SimpleCell, { list: row.averageFee })
+        renderCell: ({ row }) => /* @__PURE__ */ jsxRuntimeExports.jsx(SimpleCell, { slots: row.slots, items: row.averageFee })
       },
       {
         minWidth: 160,
@@ -41123,7 +41164,7 @@ const CustomTable = ({ onEditFee, onEditKeys }) => {
             children: title
           }
         ),
-        renderCell: ({ row }) => /* @__PURE__ */ jsxRuntimeExports.jsx(SimpleCell, { list: row.fee0 })
+        renderCell: ({ row }) => /* @__PURE__ */ jsxRuntimeExports.jsx(SimpleCell, { slots: row.slots, items: row.fee0 })
       },
       {
         minWidth: 160,
@@ -41148,7 +41189,7 @@ const CustomTable = ({ onEditFee, onEditKeys }) => {
             children: title
           }
         ),
-        renderCell: ({ row }) => /* @__PURE__ */ jsxRuntimeExports.jsx(SimpleCell, { list: row.fee1 })
+        renderCell: ({ row }) => /* @__PURE__ */ jsxRuntimeExports.jsx(SimpleCell, { slots: row.slots, items: row.fee1 })
       },
       {
         minWidth: 160,
@@ -41173,7 +41214,7 @@ const CustomTable = ({ onEditFee, onEditKeys }) => {
             children: title
           }
         ),
-        renderCell: ({ row }) => /* @__PURE__ */ jsxRuntimeExports.jsx(SimpleCell, { list: row.fee2 })
+        renderCell: ({ row }) => /* @__PURE__ */ jsxRuntimeExports.jsx(SimpleCell, { slots: row.slots, items: row.fee2 })
       }
     ];
   }, [onEditKeys, percents, memoFee0, memoFee1, memoFee2]);
@@ -41215,7 +41256,6 @@ const HomeNew = () => {
         /* @__PURE__ */ jsxRuntimeExports.jsx(Epoch, {})
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsx(PlotLayer, {}),
-      /* @__PURE__ */ jsxRuntimeExports.jsx(NextSlotInformer, {}),
       /* @__PURE__ */ jsxRuntimeExports.jsx(CustomTable, { onEditFee: setEditedFeeIdx, onEditKeys: filterModalControls.on }),
       /* @__PURE__ */ jsxRuntimeExports.jsx(
         ModalFee,
@@ -45048,4 +45088,4 @@ if (!rootElement.innerHTML) {
     /* @__PURE__ */ jsxRuntimeExports.jsx(React.Suspense, { fallback: "loading", children: /* @__PURE__ */ jsxRuntimeExports.jsx(App, { router }) })
   );
 }
-//# sourceMappingURL=index-Cpm4CTjt.js.map
+//# sourceMappingURL=index-CyRPzngB.js.map
