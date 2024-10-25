@@ -1,0 +1,48 @@
+name: "FE: Build and Deploy"
+on:
+  # test purposes
+  pull_request:
+    branches:
+      - 'master'
+    types:
+      - opened
+      - synchronize
+      - reopened
+  push:
+    branches:
+      - 'master'
+  workflow_dispatch:
+permissions:
+  contents: write
+
+concurrency:
+  group: 'pages'
+  cancel-in-progress: true
+
+jobs:
+  fe-build-and-deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: 'solfees-fe'
+    steps:
+      - name: 🔄 Checkout Code
+        uses: actions/checkout@v4
+      - name: 📦 Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - name: 🔧 Install node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+          cache-dependency-path: "solfees-fe"
+      - name: 📁 Install node_modules
+        run: pnpm install
+      - name: ️🏗️ Build application
+        run: pnpm build
+      - name: 🚀 Deploy
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: solfees-fe/dist
