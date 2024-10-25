@@ -12124,7 +12124,14 @@ const useWebSocketStore = create((set3, get3) => {
   let lastProcessedTime = Date.now();
   let isLocked = false;
   setInterval(() => {
+    var _a2;
     if (isLocked) return;
+    const lastCommitDuration = Date.now() - lastProcessedTime;
+    if (lastCommitDuration > 5e3) {
+      queue.length = 0;
+      (_a2 = get3().socket) == null ? void 0 : _a2.close();
+      createConnect();
+    }
   }, 5e3);
   function routeMessages(target) {
     const socket = get3().socket;
@@ -12229,7 +12236,7 @@ const useWebSocketStore = create((set3, get3) => {
       console.error("Error:", error);
     }
   }
-  setTimeout(() => {
+  const createConnect = () => {
     const url = "wss://api.solfees.io/api/solfees/ws";
     const socket = new WebSocket(url);
     socket.onopen = () => {
@@ -12244,7 +12251,8 @@ const useWebSocketStore = create((set3, get3) => {
     socket.onerror = (error) => {
       console.error("WebSocket error:", error);
     };
-  }, 125);
+  };
+  setTimeout(createConnect, 125);
   return {
     socket: null,
     slots2: {},
@@ -15145,6 +15153,18 @@ function useShallow(selector) {
     return shallow(prev.current, next) ? prev.current : prev.current = next;
   };
 }
+const rtf = new Intl.RelativeTimeFormat("en", {
+  localeMatcher: "best fit",
+  // other values: "lookup"
+  numeric: "always",
+  // other values: "auto"
+  style: "long"
+  // other values: "short" or "narrow"
+});
+function concatUnit(amount, unit2) {
+  if (!amount) return " ";
+  return `${amount} ${unit2}${amount % 10 === 1 ? "" : "s"}, `;
+}
 function formatDuration(seconds) {
   const days = Math.floor(seconds / (24 * 3600));
   seconds %= 24 * 3600;
@@ -15153,7 +15173,7 @@ function formatDuration(seconds) {
   const minutes = Math.floor(seconds / 60);
   seconds %= 60;
   seconds |= 0;
-  return `${days} day(s), ${hours} hour(s), ${minutes} minute(s), ${seconds} second(s)`;
+  return `${concatUnit(days, "day")}${concatUnit(hours, "hour")}${concatUnit(minutes, "minute")}${concatUnit(seconds, "second")}`.trim().replace(/,$/, "");
 }
 const TextWithTooltip = withTooltip({ content: "Top tooltip" })(Text$1);
 const Epoch = () => {
@@ -15175,26 +15195,18 @@ const Epoch = () => {
   }, [lastSlot, number2]);
   const humanCountdown = reactExports.useMemo(() => {
     if (lastSlot) {
-      const rtf = new Intl.RelativeTimeFormat("en", {
-        localeMatcher: "best fit",
-        // other values: "lookup"
-        numeric: "always",
-        // other values: "auto"
-        style: "long"
-        // other values: "short" or "narrow"
-      });
       const secs = (432e3 - lastSlot % 432e3) * 0.4;
       if (secs < 90) return rtf.format(secs, "seconds");
-      if (secs < 90 * 60) return rtf.format(secs / 60 | 0, "minutes");
-      if (secs < 1.5 * 86400) return rtf.format(secs / 3600 | 0, "hours");
-      return rtf.format(secs / 86400 | 0, "days");
+      if (secs < 90 * 60) return rtf.format(Math.ceil(secs / 60), "minutes");
+      if (secs < 1.5 * 86400) return rtf.format(Math.ceil(secs / 3600), "hours");
+      return rtf.format(Math.ceil(secs / 86400), "days");
     }
     return "...";
   }, [lastSlot]);
   const tooltipForHumanCountdown = reactExports.useMemo(() => {
     if (lastSlot) {
-      const secs = (432e3 - lastSlot % 432e3) * 0.471;
-      return formatDuration(secs) + ". Based on 400ms/slot";
+      const secs = (432e3 - lastSlot % 432e3) * 0.4;
+      return formatDuration(secs) + ". Based on 400ms/slot.";
     }
     return "...";
   }, [lastSlot]);
@@ -16821,6 +16833,7 @@ const Footer = () => {
             viewBox: "0 0 20 20",
             fill: "currentColor",
             className: "size-6 cursor-pointer active:animate-spin",
+            style: { display: "none" },
             children: /* @__PURE__ */ jsxRuntimeExports.jsx(
               "path",
               {
@@ -39775,20 +39788,12 @@ const items$1 = [
   }
 ];
 const PlotLayer = () => {
-  const [isAreaOne, areaControlsOne] = useFlag(true);
-  const [isAreaTwo, areaControlsTwo] = useFlag(true);
   const [value, setValue] = reactExports.useState(null);
   const percents = useWebSocketStore((state) => state.percents);
   const getItemLabel = (arg) => "p" + ((percents[arg.key] || 0) / 100).toLocaleString("en-US", { maximumFractionDigits: 2 });
   return /* @__PURE__ */ jsxRuntimeExports.jsx(jsxRuntimeExports.Fragment, { children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-nowrap gap-4 w-full", children: [
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx(Switch, { label: "Bars plot", checked: isAreaOne, onChange: areaControlsOne.toggle }),
-      !isAreaOne ? /* @__PURE__ */ jsxRuntimeExports.jsx(ExampleAreaOne, {}) : /* @__PURE__ */ jsxRuntimeExports.jsx(ExampleAreaOneBar, {})
-    ] }),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx(Switch, { label: "Bars plot", checked: isAreaTwo, onChange: areaControlsTwo.toggle }),
-      !isAreaTwo ? /* @__PURE__ */ jsxRuntimeExports.jsx(ExampleAreaTwo, {}) : /* @__PURE__ */ jsxRuntimeExports.jsx(ExampleAreaTwoBar, {})
-    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-full", children: /* @__PURE__ */ jsxRuntimeExports.jsx(ExampleAreaOneBar, {}) }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-full", children: /* @__PURE__ */ jsxRuntimeExports.jsx(ExampleAreaTwoBar, {}) }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx(
         SwitchGroup,
@@ -39895,109 +39900,6 @@ const CustomTooltip2 = ({ active, payload }) => {
   }
   return null;
 };
-const ExampleAreaOne = () => {
-  const slots2 = useWebSocketStore((state) => state.slots2);
-  const [type, _setType] = reactExports.useState("monotone");
-  const data = reactExports.useMemo(() => {
-    const entries = Object.entries(slots2);
-    const packedData = entries.reduce((acc, [_groupIdx, slots]) => {
-      const chunk = slots.map((elt) => {
-        const obj = {
-          x: elt.slot,
-          y: elt.totalUnitsConsumed,
-          commitment: elt.commitment,
-          value: {
-            confirmed: null,
-            finalized: null,
-            processed: null
-          }
-        };
-        obj.value[elt.commitment] = obj.y;
-        return obj;
-      });
-      const sorted = chunk.sort((a2, b2) => a2.x - b2.x);
-      acc.push(...sorted);
-      return acc;
-    }, []);
-    const filledGapsData = packedData.map((elt, idx, arr) => {
-      const prevPrev = arr[idx - 2];
-      const prev = arr[idx - 1];
-      if (prev) {
-        if (prev.commitment !== elt.commitment) {
-          prev.value[elt.commitment] = prev.y;
-        }
-        if (prevPrev) {
-          if (prev.commitment !== elt.commitment && prevPrev.commitment === elt.commitment) {
-            elt.value[prev.commitment] = elt.y;
-            prev.value[prevPrev.commitment] = null;
-          }
-        }
-      }
-      return elt;
-    });
-    return filledGapsData;
-  }, [slots2]);
-  return /* @__PURE__ */ jsxRuntimeExports.jsx(
-    "div",
-    {
-      style: {
-        width: "100%"
-      },
-      children: /* @__PURE__ */ jsxRuntimeExports.jsx(ResponsiveContainer, { width: "100%", height: 200, children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
-        ComposedChart,
-        {
-          data,
-          margin: {
-            top: 0,
-            right: 0,
-            left: 0,
-            bottom: 0
-          },
-          children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx(CartesianGrid, { strokeDasharray: "3 3", vertical: false }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx(YAxis, { scale: "auto", tickFormatter, domain: [0, 5e7] }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx(XAxis, { label: "Compute Units", orientation: "top", tick: false, axisLine: false }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx(ReferenceLine, { y: "48000000", stroke: "red" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx(Tooltip, { content: /* @__PURE__ */ jsxRuntimeExports.jsx(CustomTooltip, {}) }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx(
-              Area,
-              {
-                type,
-                dataKey: "value.processed",
-                stroke: "gray",
-                fill: "gray",
-                opacity: 1,
-                isAnimationActive: false
-              }
-            ),
-            /* @__PURE__ */ jsxRuntimeExports.jsx(
-              Area,
-              {
-                type,
-                dataKey: "value.confirmed",
-                stroke: "yellow",
-                fill: "yellow",
-                opacity: 1,
-                isAnimationActive: false
-              }
-            ),
-            /* @__PURE__ */ jsxRuntimeExports.jsx(
-              Area,
-              {
-                type,
-                dataKey: "value.finalized",
-                stroke: "green",
-                fill: "green",
-                opacity: 1,
-                isAnimationActive: false
-              }
-            )
-          ]
-        }
-      ) })
-    }
-  );
-};
 const ExampleAreaOneBar = () => {
   const slots2 = useWebSocketStore((state) => state.slots2);
   reactExports.useState("monotone");
@@ -40069,108 +39971,6 @@ const ExampleAreaOneBar = () => {
             /* @__PURE__ */ jsxRuntimeExports.jsx(
               Bar,
               {
-                dataKey: "value.finalized",
-                stroke: "green",
-                fill: "green",
-                opacity: 1,
-                isAnimationActive: false
-              }
-            )
-          ]
-        }
-      ) })
-    }
-  );
-};
-const ExampleAreaTwo = () => {
-  const slots2 = useWebSocketStore((state) => state.slots2);
-  const [type, _setType] = reactExports.useState("monotone");
-  const data = reactExports.useMemo(() => {
-    const entries = Object.entries(slots2);
-    const packedData = entries.reduce((acc, [_groupIdx, slots]) => {
-      const chunk = slots.map((elt) => {
-        const obj = {
-          x: elt.slot,
-          y: elt.totalFee,
-          commitment: elt.commitment,
-          value: {
-            confirmed: null,
-            finalized: null,
-            processed: null
-          }
-        };
-        obj.value[elt.commitment] = obj.y;
-        return obj;
-      });
-      const sorted = chunk.sort((a2, b2) => a2.x - b2.x);
-      acc.push(...sorted);
-      return acc;
-    }, []);
-    const filledGapsData = packedData.map((elt, idx, arr) => {
-      const prevPrev = arr[idx - 2];
-      const prev = arr[idx - 1];
-      if (prev) {
-        if (prev.commitment !== elt.commitment) {
-          prev.value[elt.commitment] = prev.y;
-        }
-        if (prevPrev) {
-          if (prev.commitment !== elt.commitment && prevPrev.commitment === elt.commitment) {
-            elt.value[prev.commitment] = elt.y;
-            prev.value[prevPrev.commitment] = null;
-          }
-        }
-      }
-      return elt;
-    });
-    return filledGapsData;
-  }, [slots2]);
-  return /* @__PURE__ */ jsxRuntimeExports.jsx(
-    "div",
-    {
-      style: {
-        width: "100%"
-      },
-      children: /* @__PURE__ */ jsxRuntimeExports.jsx(ResponsiveContainer, { width: "100%", height: 200, children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
-        ComposedChart,
-        {
-          data,
-          margin: {
-            top: 10,
-            right: 10,
-            left: 40,
-            bottom: 0
-          },
-          children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx(CartesianGrid, { strokeDasharray: "3 3", vertical: false }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx(YAxis, { scale: "auto", tickFormatter: tickFormatter2 }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx(XAxis, { label: "Earned SOL", orientation: "top", tick: false, axisLine: false }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx(Tooltip, { content: /* @__PURE__ */ jsxRuntimeExports.jsx(CustomTooltip2, {}) }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx(
-              Area,
-              {
-                type,
-                dataKey: "value.processed",
-                stroke: "gray",
-                fill: "gray",
-                opacity: 1,
-                isAnimationActive: false
-              }
-            ),
-            /* @__PURE__ */ jsxRuntimeExports.jsx(
-              Area,
-              {
-                type,
-                dataKey: "value.confirmed",
-                stroke: "yellow",
-                fill: "yellow",
-                opacity: 1,
-                isAnimationActive: false
-              }
-            ),
-            /* @__PURE__ */ jsxRuntimeExports.jsx(
-              Area,
-              {
-                type,
                 dataKey: "value.finalized",
                 stroke: "green",
                 fill: "green",
@@ -45248,4 +45048,4 @@ if (!rootElement.innerHTML) {
     /* @__PURE__ */ jsxRuntimeExports.jsx(React.Suspense, { fallback: "loading", children: /* @__PURE__ */ jsxRuntimeExports.jsx(App, { router }) })
   );
 }
-//# sourceMappingURL=index-B_6OWp6v.js.map
+//# sourceMappingURL=index-Cpm4CTjt.js.map
