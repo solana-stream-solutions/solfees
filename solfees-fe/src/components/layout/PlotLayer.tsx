@@ -1,7 +1,5 @@
-import { useFlag } from "@consta/uikit/useFlag";
 import { useMemo, useState } from "react";
 import { CommitmentStatus, useWebSocketStore } from "../../store/websocketStore.ts";
-import { Switch } from "@consta/uikit/Switch";
 import { SwitchGroup } from "@consta/uikit/SwitchGroup";
 import { ContentType } from "recharts/types/component/Tooltip";
 import { CurveType } from "recharts/types/shape/Curve";
@@ -39,8 +37,6 @@ const items: Item[] = [
 ];
 
 export const PlotLayer = () => {
-  const [isAreaOne, areaControlsOne] = useFlag(true);
-  const [isAreaTwo, areaControlsTwo] = useFlag(true);
   const [value, setValue] = useState<Item[] | null>(null);
   const percents = useWebSocketStore((state) => state.percents);
   const getItemLabel = (arg: Item): string =>
@@ -50,12 +46,10 @@ export const PlotLayer = () => {
     <>
       <div className="flex flex-nowrap gap-4 w-full">
         <div className="w-full">
-          <Switch label="Bars plot" checked={isAreaOne} onChange={areaControlsOne.toggle} />
-          {!isAreaOne ? <ExampleAreaOne /> : <ExampleAreaOneBar />}
+          <ExampleAreaOneBar />
         </div>
         <div className="w-full">
-          <Switch label="Bars plot" checked={isAreaTwo} onChange={areaControlsTwo.toggle} />
-          {!isAreaTwo ? <ExampleAreaTwo /> : <ExampleAreaTwoBar />}
+          <ExampleAreaTwoBar />
         </div>
         <div className="w-full">
           <SwitchGroup
@@ -183,102 +177,6 @@ type FeesInfo = {
   fee1: number | null;
   fee2: number | null;
 };
-export const ExampleAreaOne = () => {
-  const slots2 = useWebSocketStore((state) => state.slots2);
-
-  const [type, _setType] = useState<CurveType>("monotone");
-
-  const data = useMemo(() => {
-    const entries = Object.entries(slots2);
-    const packedData = entries.reduce<PlotInfo[]>((acc, [_groupIdx, slots]) => {
-      const chunk = slots.map((elt) => {
-        const obj = {
-          x: elt.slot,
-          y: elt.totalUnitsConsumed,
-          commitment: elt.commitment,
-          value: {
-            confirmed: null,
-            finalized: null,
-            processed: null,
-          },
-        } satisfies PlotInfo;
-        obj.value[elt.commitment] = obj.y as unknown as null;
-        return obj;
-      });
-      const sorted = chunk.sort((a, b) => a.x - b.x);
-      acc.push(...sorted);
-      return acc;
-    }, []);
-    // fill gaps for area plots
-    const filledGapsData = packedData.map((elt, idx, arr) => {
-      const prevPrev = arr[idx - 2];
-      const prev = arr[idx - 1];
-      if (prev) {
-        if (prev.commitment !== elt.commitment) {
-          prev.value[elt.commitment] = prev.y;
-        }
-        // Corner Case for dots with theese commitment statuses: A A A B A A A
-        if (prevPrev) {
-          if (prev.commitment !== elt.commitment && prevPrev.commitment === elt.commitment) {
-            elt.value[prev.commitment] = elt.y;
-            prev.value[prevPrev.commitment] = null;
-          }
-        }
-      }
-      return elt;
-    });
-    return filledGapsData;
-  }, [slots2]);
-  return (
-    <div
-      style={{
-        width: "100%",
-      }}
-    >
-      <ResponsiveContainer width="100%" height={200}>
-        <ComposedChart
-          data={data}
-          margin={{
-            top: 0,
-            right: 0,
-            left: 0,
-            bottom: 0,
-          }}
-        >
-          <CartesianGrid strokeDasharray="3 3" vertical={false} />
-          <YAxis scale="auto" tickFormatter={tickFormatter} domain={[0, 50_000_000]} />
-          <XAxis label="Compute Units" orientation={"top"} tick={false} axisLine={false} />
-          <ReferenceLine y="48000000" stroke="red" />
-          <Tooltip content={<CustomTooltip />} />
-          <Area
-            type={type}
-            dataKey="value.processed"
-            stroke="gray"
-            fill="gray"
-            opacity={1}
-            isAnimationActive={false}
-          />
-          <Area
-            type={type}
-            dataKey="value.confirmed"
-            stroke="yellow"
-            fill="yellow"
-            opacity={1}
-            isAnimationActive={false}
-          />
-          <Area
-            type={type}
-            dataKey="value.finalized"
-            stroke="green"
-            fill="green"
-            opacity={1}
-            isAnimationActive={false}
-          />
-        </ComposedChart>
-      </ResponsiveContainer>
-    </div>
-  );
-};
 export const ExampleAreaOneBar = () => {
   const slots2 = useWebSocketStore((state) => state.slots2);
 
@@ -355,101 +253,6 @@ export const ExampleAreaOneBar = () => {
   );
 };
 
-export const ExampleAreaTwo = () => {
-  const slots2 = useWebSocketStore((state) => state.slots2);
-
-  const [type, _setType] = useState<CurveType>("monotone");
-
-  const data = useMemo(() => {
-    const entries = Object.entries(slots2);
-    const packedData = entries.reduce<PlotInfo[]>((acc, [_groupIdx, slots]) => {
-      const chunk = slots.map((elt) => {
-        const obj = {
-          x: elt.slot,
-          y: elt.totalFee,
-          commitment: elt.commitment,
-          value: {
-            confirmed: null,
-            finalized: null,
-            processed: null,
-          },
-        } satisfies PlotInfo;
-        obj.value[elt.commitment] = obj.y as unknown as null;
-        return obj;
-      });
-      const sorted = chunk.sort((a, b) => a.x - b.x);
-      acc.push(...sorted);
-      return acc;
-    }, []);
-    // fill gaps for area plots
-    const filledGapsData = packedData.map((elt, idx, arr) => {
-      const prevPrev = arr[idx - 2];
-      const prev = arr[idx - 1];
-      if (prev) {
-        if (prev.commitment !== elt.commitment) {
-          prev.value[elt.commitment] = prev.y;
-        }
-        // Corner Case for dots with theese commitment statuses: A A A B A A A
-        if (prevPrev) {
-          if (prev.commitment !== elt.commitment && prevPrev.commitment === elt.commitment) {
-            elt.value[prev.commitment] = elt.y;
-            prev.value[prevPrev.commitment] = null;
-          }
-        }
-      }
-      return elt;
-    });
-    return filledGapsData;
-  }, [slots2]);
-  return (
-    <div
-      style={{
-        width: "100%",
-      }}
-    >
-      <ResponsiveContainer width="100%" height={200}>
-        <ComposedChart
-          data={data}
-          margin={{
-            top: 10,
-            right: 10,
-            left: 40,
-            bottom: 0,
-          }}
-        >
-          <CartesianGrid strokeDasharray="3 3" vertical={false} />
-          <YAxis scale="auto" tickFormatter={tickFormatter2} />
-          <XAxis label="Earned SOL" orientation={"top"} tick={false} axisLine={false} />
-          <Tooltip content={<CustomTooltip2 />} />
-          <Area
-            type={type}
-            dataKey="value.processed"
-            stroke="gray"
-            fill="gray"
-            opacity={1}
-            isAnimationActive={false}
-          />
-          <Area
-            type={type}
-            dataKey="value.confirmed"
-            stroke="yellow"
-            fill="yellow"
-            opacity={1}
-            isAnimationActive={false}
-          />
-          <Area
-            type={type}
-            dataKey="value.finalized"
-            stroke="green"
-            fill="green"
-            opacity={1}
-            isAnimationActive={false}
-          />
-        </ComposedChart>
-      </ResponsiveContainer>
-    </div>
-  );
-};
 export const ExampleAreaTwoBar = () => {
   const slots2 = useWebSocketStore((state) => state.slots2);
 

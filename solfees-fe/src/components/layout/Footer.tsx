@@ -1,10 +1,5 @@
-import { useEffect, useState } from "react";
-import { CommitmentStatus, useWebSocketStore } from "../../store/websocketStore.ts";
-import { IconPropView } from "@consta/icons/Icon";
-import { IconProcessing } from "@consta/icons/IconProcessing";
-import { IconCheck } from "@consta/icons/IconCheck";
-import { IconAllDone } from "@consta/icons/IconAllDone";
-import { IconWatchStroked } from "@consta/icons/IconWatchStroked";
+import { useEffect } from "react";
+import { useWebSocketStore } from "../../store/websocketStore.ts";
 import { AnimateIconBase } from "@consta/icons/AnimateIconBase";
 import { IconPlay } from "@consta/icons/IconPlay";
 import { IconPause } from "@consta/icons/IconPause";
@@ -194,6 +189,7 @@ export const Footer = () => {
             viewBox="0 0 20 20"
             fill="currentColor"
             className="size-6 cursor-pointer active:animate-spin"
+            style={{ display: "none" }}
           >
             <path
               fillRule="evenodd"

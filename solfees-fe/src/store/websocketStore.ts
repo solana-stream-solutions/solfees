@@ -51,7 +51,9 @@ export const useWebSocketStore = create<WebSocketState>((set, get: () => WebSock
     if (isLocked) return;
     const lastCommitDuration = Date.now() - lastProcessedTime;
     if (lastCommitDuration > 5_000) {
-      /* TODO: make reconnect if no new payloads */
+      queue.length = 0;
+      get().socket?.close();
+      createConnect();
     }
   }, 5000);
 
@@ -180,7 +182,7 @@ export const useWebSocketStore = create<WebSocketState>((set, get: () => WebSock
     }
   }
 
-  setTimeout(() => {
+  const createConnect = () => {
     const url = "wss://api.solfees.io/api/solfees/ws";
     const socket = new WebSocket(url);
 
@@ -196,7 +198,9 @@ export const useWebSocketStore = create<WebSocketState>((set, get: () => WebSock
     socket.onerror = (error) => {
       console.error("WebSocket error:", error);
     };
-  }, 125);
+  };
+
+  setTimeout(createConnect, 125);
 
   return {
     socket: null,

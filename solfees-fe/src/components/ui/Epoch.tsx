@@ -5,6 +5,17 @@ import { Text } from "@consta/uikit/Text";
 import { useScheduleStore } from "../../store/scheduleStore.ts";
 import { useShallow } from "zustand/react/shallow";
 
+const rtf = new Intl.RelativeTimeFormat("en", {
+  localeMatcher: "best fit", // other values: "lookup"
+  numeric: "always", // other values: "auto"
+  style: "long", // other values: "short" or "narrow"
+});
+
+function concatUnit(amount: number, unit: string): string {
+  if (!amount) return " ";
+  return `${amount} ${unit}${amount % 10 === 1 ? "" : "s"}, `;
+}
+
 function formatDuration(seconds: number) {
   const days = Math.floor(seconds / (24 * 3600));
   seconds %= 24 * 3600;
@@ -14,7 +25,9 @@ function formatDuration(seconds: number) {
   seconds %= 60;
   seconds |= 0;
 
-  return `${days} day(s), ${hours} hour(s), ${minutes} minute(s), ${seconds} second(s)`;
+  return `${concatUnit(days, "day")}${concatUnit(hours, "hour")}${concatUnit(minutes, "minute")}${concatUnit(seconds, "second")}`
+    .trim()
+    .replace(/,$/, "");
 }
 
 const TextWithTooltip = withTooltip({ content: "Top tooltip" })(Text);
@@ -37,25 +50,21 @@ export const Epoch = () => {
     }
     return "";
   }, [lastSlot, number]);
+  // TODO probably we should display 00:00:00 countdown with days?
   const humanCountdown = useMemo(() => {
     if (lastSlot) {
-      const rtf = new Intl.RelativeTimeFormat("en", {
-        localeMatcher: "best fit", // other values: "lookup"
-        numeric: "always", // other values: "auto"
-        style: "long", // other values: "short" or "narrow"
-      });
       const secs = (432_000 - (lastSlot % 432_000)) * 0.4;
       if (secs < 90) return rtf.format(secs, "seconds"); // 1.5 minutes
-      if (secs < 90 * 60) return rtf.format((secs / 60) | 0, "minutes"); // 1.5 hours
-      if (secs < 1.5 * 86_400) return rtf.format((secs / 3_600) | 0, "hours"); // 1.5 days
-      return rtf.format((secs / 86_400) | 0, "days");
+      if (secs < 90 * 60) return rtf.format(Math.ceil(secs / 60), "minutes"); // 1.5 hours
+      if (secs < 1.5 * 86_400) return rtf.format(Math.ceil(secs / 3_600), "hours"); // 1.5 days
+      return rtf.format(Math.ceil(secs / 86_400), "days");
     }
     return "...";
   }, [lastSlot]);
   const tooltipForHumanCountdown = useMemo(() => {
     if (lastSlot) {
-      const secs = (432_000 - (lastSlot % 432_000)) * 0.471;
-      return formatDuration(secs) + ". Based on 400ms/slot";
+      const secs = (432_000 - (lastSlot % 432_000)) * 0.4;
+      return formatDuration(secs) + ". Based on 400ms/slot.";
     }
     return "...";
   }, [lastSlot]);
