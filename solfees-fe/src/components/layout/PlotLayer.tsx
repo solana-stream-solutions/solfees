@@ -87,21 +87,21 @@ const CustomTooltip: ContentType<any, any> = ({ active, payload }) => {
           </p>
           <ul className="recharts-tooltip-item-list">
             <li className="recharts-tooltip-item">
-              <span className="recharts-tooltip-item-name">Tracked Items</span>
-              <span className="recharts-tooltip-item-separator"> : </span>
+              <span className="recharts-tooltip-item-name">Compute Units</span>
+              <span className="recharts-tooltip-item-separator">: </span>
               <span className="recharts-tooltip-item-value">{elt.y.toLocaleString("en-US")}</span>
             </li>
-            <li className="recharts-tooltip-item">
+            <li className="recharts-tooltip-item hidden">
               <span className="recharts-tooltip-item-name">DEBUG processed</span>
               <span className="recharts-tooltip-item-separator"> : </span>
               <span className="recharts-tooltip-item-value">{elt.value.processed}</span>
             </li>
-            <li className="recharts-tooltip-item">
+            <li className="recharts-tooltip-item hidden">
               <span className="recharts-tooltip-item-name">DEBUG confirmed</span>
               <span className="recharts-tooltip-item-separator"> : </span>
               <span className="recharts-tooltip-item-value">{elt.value.confirmed}</span>
             </li>
-            <li className="recharts-tooltip-item">
+            <li className="recharts-tooltip-item hidden">
               <span className="recharts-tooltip-item-name">DEBUG finalized</span>
               <span className="recharts-tooltip-item-separator"> : </span>
               <span className="recharts-tooltip-item-value">{elt.value.finalized}</span>
@@ -139,17 +139,17 @@ const CustomTooltip2: ContentType<any, any> = ({ active, payload }) => {
               <span className="recharts-tooltip-item-separator"> : </span>
               <span className="recharts-tooltip-item-value">{valueInTooltip}</span>
             </li>
-            <li className="recharts-tooltip-item">
+            <li className="recharts-tooltip-item hidden">
               <span className="recharts-tooltip-item-name">DEBUG processed</span>
               <span className="recharts-tooltip-item-separator"> : </span>
               <span className="recharts-tooltip-item-value">{elt.value.processed}</span>
             </li>
-            <li className="recharts-tooltip-item">
+            <li className="recharts-tooltip-item hidden">
               <span className="recharts-tooltip-item-name">DEBUG confirmed</span>
               <span className="recharts-tooltip-item-separator"> : </span>
               <span className="recharts-tooltip-item-value">{elt.value.confirmed}</span>
             </li>
-            <li className="recharts-tooltip-item">
+            <li className="recharts-tooltip-item hidden">
               <span className="recharts-tooltip-item-name">DEBUG finalized</span>
               <span className="recharts-tooltip-item-separator"> : </span>
               <span className="recharts-tooltip-item-value">{elt.value.finalized}</span>

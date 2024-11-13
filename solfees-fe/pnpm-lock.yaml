@@ -12,8 +12,8 @@ importers:
         specifier: ^1.1.0
         version: 1.1.0(@consta/uikit@5.9.2)
       '@consta/table':
-        specifier: 0.1.0-beta
-        version: 0.1.0-beta(@consta/icons@1.1.0(@consta/uikit@5.9.2))(@consta/uikit@5.9.2(@bem-react/classname@1.6.0)(@bem-react/classnames@1.3.10)(@consta/icons@1.1.0)(compute-scroll-into-view@1.0.20)(date-fns@2.30.0)(react-dom@18.3.1(react@18.3.1))(react-dropzone@14.2.9(react@18.3.1))(react-imask@7.6.1(react@18.3.1))(react-textarea-autosize@8.5.3(@types/react@18.3.5)(react@18.3.1))(react-transition-group@4.4.5(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1))
+        specifier: ^0.2.0
+        version: 0.2.0(@consta/icons@1.1.0(@consta/uikit@5.9.2))(@consta/uikit@5.9.2(@bem-react/classname@1.6.0)(@bem-react/classnames@1.3.10)(@consta/icons@1.1.0)(compute-scroll-into-view@1.0.20)(date-fns@2.30.0)(react-dom@18.3.1(react@18.3.1))(react-dropzone@14.2.9(react@18.3.1))(react-imask@7.6.1(react@18.3.1))(react-textarea-autosize@8.5.3(@types/react@18.3.5)(react@18.3.1))(react-transition-group@4.4.5(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1))
       '@consta/uikit':
         specifier: ^5.9.2
         version: 5.9.2(@bem-react/classname@1.6.0)(@bem-react/classnames@1.3.10)(@consta/icons@1.1.0)(compute-scroll-into-view@1.0.20)(date-fns@2.30.0)(react-dom@18.3.1(react@18.3.1))(react-dropzone@14.2.9(react@18.3.1))(react-imask@7.6.1(react@18.3.1))(react-textarea-autosize@8.5.3(@types/react@18.3.5)(react@18.3.1))(react-transition-group@4.4.5(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)
@@ -937,8 +937,8 @@ packages:
     peerDependencies:
       '@consta/uikit': ^5.0.0
 
-  '@consta/table@0.1.0-beta':
-    resolution: {integrity: sha512-FqpYzhHF7mMO+ZU17dcrbmrGihIcnhPcun2MWYyjfXtZJLUAuhfCMG3cR9USbvYOH/iAPN/JE25rZgstiOzvLw==}
+  '@consta/table@0.2.0':
+    resolution: {integrity: sha512-iidROwbXaO5QDnzxDN2bzGHq0IDfw4IZjzGZpwtkBV+F9ejB8s6Hf9wQwusWqvHmVKA5FkdlVnoyQ+IPNyyQVw==}
     peerDependencies:
       '@consta/icons': ^1.0.1
       '@consta/uikit': ^5.4.1
@@ -6395,7 +6395,7 @@ snapshots:
     dependencies:
       '@consta/uikit': 5.9.2(@bem-react/classname@1.6.0)(@bem-react/classnames@1.3.10)(@consta/icons@1.1.0)(compute-scroll-into-view@1.0.20)(date-fns@2.30.0)(react-dom@18.3.1(react@18.3.1))(react-dropzone@14.2.9(react@18.3.1))(react-imask@7.6.1(react@18.3.1))(react-textarea-autosize@8.5.3(@types/react@18.3.5)(react@18.3.1))(react-transition-group@4.4.5(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)
 
-  '@consta/table@0.1.0-beta(@consta/icons@1.1.0(@consta/uikit@5.9.2))(@consta/uikit@5.9.2(@bem-react/classname@1.6.0)(@bem-react/classnames@1.3.10)(@consta/icons@1.1.0)(compute-scroll-into-view@1.0.20)(date-fns@2.30.0)(react-dom@18.3.1(react@18.3.1))(react-dropzone@14.2.9(react@18.3.1))(react-imask@7.6.1(react@18.3.1))(react-textarea-autosize@8.5.3(@types/react@18.3.5)(react@18.3.1))(react-transition-group@4.4.5(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1))':
+  '@consta/table@0.2.0(@consta/icons@1.1.0(@consta/uikit@5.9.2))(@consta/uikit@5.9.2(@bem-react/classname@1.6.0)(@bem-react/classnames@1.3.10)(@consta/icons@1.1.0)(compute-scroll-into-view@1.0.20)(date-fns@2.30.0)(react-dom@18.3.1(react@18.3.1))(react-dropzone@14.2.9(react@18.3.1))(react-imask@7.6.1(react@18.3.1))(react-textarea-autosize@8.5.3(@types/react@18.3.5)(react@18.3.1))(react-transition-group@4.4.5(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1))':
     dependencies:
       '@consta/icons': 1.1.0(@consta/uikit@5.9.2)
       '@consta/uikit': 5.9.2(@bem-react/classname@1.6.0)(@bem-react/classnames@1.3.10)(@consta/icons@1.1.0)(compute-scroll-into-view@1.0.20)(date-fns@2.30.0)(react-dom@18.3.1(react@18.3.1))(react-dropzone@14.2.9(react@18.3.1))(react-imask@7.6.1(react@18.3.1))(react-textarea-autosize@8.5.3(@types/react@18.3.5)(react@18.3.1))(react-transition-group@4.4.5(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)
