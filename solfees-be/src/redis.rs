@@ -5,6 +5,7 @@ use {
         schedule::{LeaderScheduleRpc, LeadersSchedule, LeadersScheduleSolfees},
     },
     anyhow::Context,
+    jsonrpc_core::Value as JsonrpcValue,
     lru::LruCache,
     redis::{streams::StreamReadReply, AsyncConnectionConfig, Client, Value as RedisValue},
     solana_sdk::{clock::Epoch, epoch_schedule::EpochSchedule},
@@ -17,8 +18,8 @@ pub enum RedisMessage {
     Geyser(GeyserMessage),
     Epoch {
         epoch: Epoch,
-        leader_schedule_solfees: Arc<LeadersScheduleSolfees>,
-        leader_schedule_rpc: Arc<LeaderScheduleRpc>,
+        leader_schedule_solfees: Arc<JsonrpcValue>, // serialized `LeadersScheduleSolfees`
+        leader_schedule_rpc: Arc<JsonrpcValue>,     // serialized `HashMap<String, Vec<usize>>`
     },
 }
 
@@ -26,12 +27,19 @@ impl RedisMessage {
     fn build_epoch(epoch: Epoch, data: &[u8]) -> anyhow::Result<Self> {
         let leader_schedule_rpc: LeaderScheduleRpc = bincode::deserialize(data)
             .with_context(|| format!("failed to deserialie epoch {epoch}"))?;
-        let leader_schedule = LeadersSchedule::new(&leader_schedule_rpc)
-            .with_context(|| format!("failed to build schedule for epoch {epoch}"))?;
+        let leader_schedule_solfees: LeadersScheduleSolfees =
+            LeadersSchedule::new(&leader_schedule_rpc)
+                .with_context(|| format!("failed to build schedule for epoch {epoch}"))?
+                .into();
+
+        let leader_schedule_solfees =
+            serde_json::to_value(&leader_schedule_solfees).expect("failed to serialize");
+        let leader_schedule_rpc =
+            serde_json::to_value(&leader_schedule_rpc).expect("failed to serialize");
 
         Ok(Self::Epoch {
             epoch,
-            leader_schedule_solfees: Arc::new(leader_schedule.into()),
+            leader_schedule_solfees: Arc::new(leader_schedule_solfees),
             leader_schedule_rpc: Arc::new(leader_schedule_rpc),
         })
     }
