@@ -1,4 +1,11 @@
-/target
-/test-ledger
+# Rust
+target
 
+# Solana
+test-ledger
+
+# Redis
 dump.rdb
+
+# IDE, configs
+.idea

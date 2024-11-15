@@ -23,5 +23,6 @@ The minor version will be incremented upon a breaking change and the patch versi
 - metrics: add requests queue size ([#7](https://github.com/solana-stream-solutions/solfees/pull/7))
 - api: optimize getLeaderSchedule ([#9](https://github.com/solana-stream-solutions/solfees/pull/9))
 - geyser: wait all transactions before process block ([#10](https://github.com/solana-stream-solutions/solfees/pull/10))
+- frontend: init ([#8](https://github.com/solana-stream-solutions/solfees/pull/8))
 
 ### Breaking
