@@ -9,11 +9,7 @@ insert_final_newline = true
 [*.{diff,md}]
 trim_trailing_whitespace = false
 
-[*.{js,json}]
-indent_style = space
-indent_size = 2
-
-[*.proto]
+[*.{cjs,js,json,proto,ts,yaml,yml}]
 indent_style = space
 indent_size = 2
 
