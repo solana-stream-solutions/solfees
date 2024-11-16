@@ -156,10 +156,13 @@ impl SolanaRpc {
             streams_tx: streams_tx.clone(),
         };
 
-        let mut futs =
-            vec![Self::run_subscribe_update_loop(redis_tx.subscribe(), streams_tx).boxed()];
+        let mut futs = vec![
+            // WebSocket source
+            Self::run_subscribe_update_loop(redis_tx.subscribe(), streams_tx).boxed(),
+        ];
         for (index, ()) in std::iter::repeat(()).take(pool_size).enumerate() {
             futs.push(
+                // RPC handler
                 Self::run_request_update_loop(
                     index,
                     redis_tx.subscribe(),
