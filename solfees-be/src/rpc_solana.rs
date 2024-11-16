@@ -340,7 +340,7 @@ impl SolanaRpc {
                                         id: call.id.clone(),
                                         slot: None,
                                         epoch: Some(epoch),
-                                        commitment: CommitmentLevel::Finalized,
+                                        commitment: CommitmentLevel::Confirmed,
                                         identity: None,
                                     }
                                 },
