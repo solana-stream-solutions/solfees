@@ -5,7 +5,7 @@ use {
         redis::RedisMessage,
     },
     futures::{
-        future::{pending, BoxFuture, FutureExt},
+        future::{join_all, pending, BoxFuture, FutureExt},
         sink::SinkExt,
         stream::StreamExt,
     },
@@ -128,7 +128,7 @@ pub struct SolanaRpc {
     request_calls_max: usize,
     request_timeout: Duration,
     redis_tx: broadcast::Sender<RedisMessage>,
-    requests_tx: mpsc::Sender<RpcRequests>,
+    requests_tx: mpsc::Sender<RpcRequestTask>,
     streams_tx: broadcast::Sender<Arc<StreamsUpdateMessage>>,
 }
 
@@ -136,7 +136,7 @@ impl SolanaRpc {
     pub fn new(
         request_calls_max: usize,
         request_timeout: Duration,
-        request_queue_max: usize,
+        calls_queue_max: usize,
         streams_channel_capacity: usize,
         pool_size: usize,
     ) -> (Self, Vec<BoxFuture<'static, anyhow::Result<()>>>) {
@@ -144,7 +144,7 @@ impl SolanaRpc {
 
         let (redis_tx, _redis_rx) = broadcast::channel(REDIS_CHANNEL_SIZE);
         let (streams_tx, _streams_rx) = broadcast::channel(streams_channel_capacity);
-        let (requests_tx, requests_rx) = mpsc::channel(request_queue_max);
+        let (requests_tx, requests_rx) = mpsc::channel(calls_queue_max);
 
         let requests_rx = Arc::new(Mutex::new(requests_rx));
 
@@ -506,22 +506,28 @@ impl SolanaRpc {
 
         if !requests.is_empty() {
             let shutdown = Arc::new(AtomicBool::new(false));
-            let (response_tx, response_rx) = oneshot::channel();
 
-            match self.requests_tx.try_send(RpcRequests {
-                requests,
-                shutdown: Arc::clone(&shutdown),
-                response_tx,
-            }) {
-                Ok(()) => {}
-                Err(mpsc::error::TrySendError::Full(_)) => {
-                    anyhow::bail!("requests queue is full");
+            let mut rxs = Vec::with_capacity(requests.len());
+            for request in requests {
+                let (tx, rx) = oneshot::channel();
+                match self.requests_tx.try_send(RpcRequestTask {
+                    request,
+                    shutdown: Arc::clone(&shutdown),
+                    tx,
+                }) {
+                    Ok(()) => {}
+                    Err(mpsc::error::TrySendError::Full(_)) => {
+                        shutdown.store(true, Ordering::Relaxed);
+                        anyhow::bail!("requests queue is full");
+                    }
+                    Err(mpsc::error::TrySendError::Closed(_)) => {
+                        anyhow::bail!("processed loop is closed");
+                    }
                 }
-                Err(mpsc::error::TrySendError::Closed(_)) => {
-                    anyhow::bail!("processed loop is closed");
-                }
+                metrics::requests_queue_size_inc();
+                rxs.push(rx);
             }
-            metrics::requests_queue_size_inc();
+            let response_rx = join_all(rxs);
 
             tokio::select! {
                 value = shutdown_rx.recv() => match value {
@@ -538,13 +544,13 @@ impl SolanaRpc {
                 },
                 maybe_outputs = response_rx => {
                     let mut index = 0;
-                    for output in maybe_outputs.map_err(|_error| anyhow::anyhow!("request dropped"))? {
+                    for output in maybe_outputs {
                         while index < outputs.len() && outputs[index].is_some() {
                             index += 1;
                         }
                         anyhow::ensure!(index < outputs.len(), "output index out of bounds");
 
-                        outputs[index] = Some(output);
+                        outputs[index] = Some(output.map_err(|_error| anyhow::anyhow!("request dropped"))?);
                     }
                 }
             }
@@ -744,7 +750,9 @@ impl SolanaRpc {
         error
     }
 
-    async fn get_next_requests(rx: &Mutex<mpsc::Receiver<RpcRequests>>) -> Option<RpcRequests> {
+    async fn get_next_requests(
+        rx: &Mutex<mpsc::Receiver<RpcRequestTask>>,
+    ) -> Option<RpcRequestTask> {
         rx.lock().await.recv().await
     }
 
@@ -787,7 +795,7 @@ impl SolanaRpc {
     async fn run_request_update_loop(
         index: usize,
         mut redis_rx: broadcast::Receiver<RedisMessage>,
-        requests_rx: Arc<Mutex<mpsc::Receiver<RpcRequests>>>,
+        requests_rx: Arc<Mutex<mpsc::Receiver<RpcRequestTask>>>,
     ) -> anyhow::Result<()> {
         let mut latest_blockhash_storage = LatestBlockhashStorage::default();
         let mut slots_info = BTreeMap::<Slot, StreamsSlotInfo>::new();
@@ -838,140 +846,19 @@ impl SolanaRpc {
                     Err(broadcast::error::RecvError::Lagged(_lag)) => anyhow::bail!("run_request_update_loop#{index} lagged"),
                 },
 
-                maybe_rpc_requests = Self::get_next_requests(&requests_rx) => match maybe_rpc_requests {
-                    Some(rpc_requests) => {
+                maybe_rpc_requests_task = Self::get_next_requests(&requests_rx) => match maybe_rpc_requests_task {
+                    Some(task) => {
                         metrics::requests_queue_size_dec();
-
-                        if rpc_requests.shutdown.load(Ordering::Relaxed) {
-                            continue;
+                        if !task.shutdown.load(Ordering::Relaxed) {
+                            let _ = task.tx.send(Self::handle_request_task(
+                                task.request,
+                                &latest_blockhash_storage,
+                                &slots_info,
+                                &epoch_schedule,
+                                &leader_schedule_map_solfees,
+                                &leader_schedule_map_rpc
+                            ));
                         }
-
-                        let outputs = rpc_requests
-                            .requests
-                            .into_iter()
-                            .map(|request| {
-                                match request {
-                                    RpcRequest::LatestBlockhash { jsonrpc, id, commitment, rollback, min_context_slot } => {
-                                        if rollback > MAX_PROCESSING_AGE {
-                                            let error = JsonrpcError::invalid_params(format!("rollback exceeds {MAX_PROCESSING_AGE}"));
-                                            return Self::create_failure(jsonrpc, id, error);
-                                        }
-
-                                        let mut slot = match commitment {
-                                            CommitmentLevel::Processed => latest_blockhash_storage.slot_processed,
-                                            CommitmentLevel::Confirmed => latest_blockhash_storage.slot_confirmed,
-                                            CommitmentLevel::Finalized => latest_blockhash_storage.slot_finalized,
-                                        };
-
-                                        if let Some(min_context_slot) = min_context_slot {
-                                            if slot < min_context_slot {
-                                                let error = RpcCustomError::MinContextSlotNotReached { context_slot: slot }.into();
-                                                return Self::create_failure(jsonrpc, id, error);
-                                            }
-                                        }
-
-                                        let Some(mut value) = latest_blockhash_storage.slots.get(&slot) else {
-                                            return Self::create_failure(jsonrpc, id, SolanaRpc::internal_error_with_data("no slot"));
-                                        };
-                                        if rollback > 0 {
-                                            let Some(first_available_slot) = latest_blockhash_storage.slots.keys().next().copied() else {
-                                                return Self::create_failure(jsonrpc, id, JsonrpcError::invalid_params("empty slots storage"));
-                                            };
-
-                                            for _ in 0..rollback {
-                                                loop {
-                                                    slot -= 1;
-
-                                                    if let Some(prev_value) = latest_blockhash_storage.slots.get(&slot) {
-                                                        if prev_value.height + 1 == value.height {
-                                                            value = prev_value;
-                                                            break;
-                                                        }
-                                                    } else if slot < first_available_slot {
-                                                        return Self::create_failure(jsonrpc, id, JsonrpcError::invalid_params("not enought slots in the storage"));
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                        Self::create_success2(jsonrpc, id, RpcResponse {
-                                            context: RpcResponseContext::new(slot),
-                                            value: RpcBlockhash {
-                                                blockhash: value.hash.to_string(),
-                                                last_valid_block_height: value.height + MAX_PROCESSING_AGE as u64,
-                                            },
-                                        })
-                                    }
-                                    RpcRequest::LeaderSchedule { jsonrpc, id, slot, epoch, commitment, identity } => {
-                                        if let Some(epoch) = epoch {
-                                            Self::create_success(jsonrpc, id, leader_schedule_map_solfees.get(&epoch))
-                                        } else {
-                                            let slot = slot.unwrap_or({
-                                                match commitment {
-                                                    CommitmentLevel::Processed => latest_blockhash_storage.slot_processed,
-                                                    CommitmentLevel::Confirmed => latest_blockhash_storage.slot_confirmed,
-                                                    CommitmentLevel::Finalized => latest_blockhash_storage.slot_finalized,
-                                                }
-                                            });
-                                            let epoch = epoch_schedule.get_epoch(slot);
-
-                                            if let Some(identity) = identity {
-                                                let mut map = HashMap::new();
-                                                if let Some(slots) = leader_schedule_map_rpc.get(&epoch).and_then(|m| m.get(&identity)) {
-                                                    map.insert(identity, slots);
-                                                }
-                                                Self::create_success2(jsonrpc, id, Some(&map))
-                                            } else {
-                                                Self::create_success(jsonrpc, id, leader_schedule_map_rpc.get(&epoch))
-                                            }
-                                        }
-                                    }
-                                    RpcRequest::RecentPrioritizationFees { jsonrpc, id, pubkeys, percentile } => {
-                                        let result = slots_info
-                                            .iter()
-                                            .map(|(slot, value)| RpcPrioritizationFee {
-                                                slot: *slot,
-                                                prioritization_fee: value.fees.get_fee(&pubkeys, percentile),
-                                            })
-                                            .collect::<Vec<_>>();
-
-                                        Self::create_success(jsonrpc, id, result)
-                                    }
-                                    RpcRequest::Slot { jsonrpc, id, commitment, min_context_slot } => {
-                                        let slot = match commitment {
-                                            CommitmentLevel::Processed => latest_blockhash_storage.slot_processed,
-                                            CommitmentLevel::Confirmed => latest_blockhash_storage.slot_confirmed,
-                                            CommitmentLevel::Finalized => latest_blockhash_storage.slot_finalized,
-                                        };
-
-                                        if let Some(min_context_slot) = min_context_slot {
-                                            if slot < min_context_slot {
-                                                let error = RpcCustomError::MinContextSlotNotReached { context_slot: slot }.into();
-                                                return Self::create_failure(jsonrpc, id, error);
-                                            }
-                                        }
-
-                                        Self::create_success2(jsonrpc, id, slot)
-                                    }
-                                    RpcRequest::SolfeesSlots { jsonrpc, id, filter, frontend } => {
-                                        let outputs = slots_info.values().map(|info| info.get_filtered(&filter));
-                                        if frontend {
-                                            Self::create_success(jsonrpc, id, outputs.collect::<Vec<_>>())
-                                        } else {
-                                            match outputs
-                                                .map(SolfeesPrioritizationFee::try_from)
-                                                .collect::<Result<Vec<_>, JsonrpcError>>()
-                                            {
-                                                Ok(outputs) => Self::create_success(jsonrpc, id, outputs),
-                                                Err(error) => Self::create_failure(jsonrpc, id, error),
-                                            }
-                                        }
-                                    }
-                                }
-                            })
-                            .collect::<Vec<JsonrpcOutputArced>>();
-
-                        let _ = rpc_requests.response_tx.send(outputs);
                     },
                     None => break,
                 },
@@ -979,6 +866,189 @@ impl SolanaRpc {
         }
 
         Ok(())
+    }
+
+    fn handle_request_task(
+        request: RpcRequest,
+        latest_blockhash_storage: &LatestBlockhashStorage,
+        slots_info: &BTreeMap<Slot, StreamsSlotInfo>,
+        epoch_schedule: &EpochSchedule,
+        leader_schedule_map_solfees: &HashMap<Slot, Arc<JsonrcpValue>>,
+        leader_schedule_map_rpc: &HashMap<Slot, Arc<JsonrcpValue>>,
+    ) -> JsonrpcOutputArced {
+        match request {
+            RpcRequest::LatestBlockhash {
+                jsonrpc,
+                id,
+                commitment,
+                rollback,
+                min_context_slot,
+            } => {
+                if rollback > MAX_PROCESSING_AGE {
+                    let error = JsonrpcError::invalid_params(format!(
+                        "rollback exceeds {MAX_PROCESSING_AGE}"
+                    ));
+                    return Self::create_failure(jsonrpc, id, error);
+                }
+
+                let mut slot = match commitment {
+                    CommitmentLevel::Processed => latest_blockhash_storage.slot_processed,
+                    CommitmentLevel::Confirmed => latest_blockhash_storage.slot_confirmed,
+                    CommitmentLevel::Finalized => latest_blockhash_storage.slot_finalized,
+                };
+
+                if let Some(min_context_slot) = min_context_slot {
+                    if slot < min_context_slot {
+                        let error =
+                            RpcCustomError::MinContextSlotNotReached { context_slot: slot }.into();
+                        return Self::create_failure(jsonrpc, id, error);
+                    }
+                }
+
+                let Some(mut value) = latest_blockhash_storage.slots.get(&slot) else {
+                    return Self::create_failure(
+                        jsonrpc,
+                        id,
+                        SolanaRpc::internal_error_with_data("no slot"),
+                    );
+                };
+                if rollback > 0 {
+                    let Some(first_available_slot) =
+                        latest_blockhash_storage.slots.keys().next().copied()
+                    else {
+                        return Self::create_failure(
+                            jsonrpc,
+                            id,
+                            JsonrpcError::invalid_params("empty slots storage"),
+                        );
+                    };
+
+                    for _ in 0..rollback {
+                        loop {
+                            slot -= 1;
+
+                            if let Some(prev_value) = latest_blockhash_storage.slots.get(&slot) {
+                                if prev_value.height + 1 == value.height {
+                                    value = prev_value;
+                                    break;
+                                }
+                            } else if slot < first_available_slot {
+                                return Self::create_failure(
+                                    jsonrpc,
+                                    id,
+                                    JsonrpcError::invalid_params(
+                                        "not enought slots in the storage",
+                                    ),
+                                );
+                            }
+                        }
+                    }
+                }
+
+                Self::create_success2(
+                    jsonrpc,
+                    id,
+                    RpcResponse {
+                        context: RpcResponseContext::new(slot),
+                        value: RpcBlockhash {
+                            blockhash: value.hash.to_string(),
+                            last_valid_block_height: value.height + MAX_PROCESSING_AGE as u64,
+                        },
+                    },
+                )
+            }
+            RpcRequest::LeaderSchedule {
+                jsonrpc,
+                id,
+                slot,
+                epoch,
+                commitment,
+                identity,
+            } => {
+                if let Some(epoch) = epoch {
+                    Self::create_success(jsonrpc, id, leader_schedule_map_solfees.get(&epoch))
+                } else {
+                    let slot = slot.unwrap_or({
+                        match commitment {
+                            CommitmentLevel::Processed => latest_blockhash_storage.slot_processed,
+                            CommitmentLevel::Confirmed => latest_blockhash_storage.slot_confirmed,
+                            CommitmentLevel::Finalized => latest_blockhash_storage.slot_finalized,
+                        }
+                    });
+                    let epoch = epoch_schedule.get_epoch(slot);
+
+                    if let Some(identity) = identity {
+                        let mut map = HashMap::new();
+                        if let Some(slots) = leader_schedule_map_rpc
+                            .get(&epoch)
+                            .and_then(|m| m.get(&identity))
+                        {
+                            map.insert(identity, slots);
+                        }
+                        Self::create_success2(jsonrpc, id, Some(&map))
+                    } else {
+                        Self::create_success(jsonrpc, id, leader_schedule_map_rpc.get(&epoch))
+                    }
+                }
+            }
+            RpcRequest::RecentPrioritizationFees {
+                jsonrpc,
+                id,
+                pubkeys,
+                percentile,
+            } => {
+                let result = slots_info
+                    .iter()
+                    .map(|(slot, value)| RpcPrioritizationFee {
+                        slot: *slot,
+                        prioritization_fee: value.fees.get_fee(&pubkeys, percentile),
+                    })
+                    .collect::<Vec<_>>();
+
+                Self::create_success(jsonrpc, id, result)
+            }
+            RpcRequest::Slot {
+                jsonrpc,
+                id,
+                commitment,
+                min_context_slot,
+            } => {
+                let slot = match commitment {
+                    CommitmentLevel::Processed => latest_blockhash_storage.slot_processed,
+                    CommitmentLevel::Confirmed => latest_blockhash_storage.slot_confirmed,
+                    CommitmentLevel::Finalized => latest_blockhash_storage.slot_finalized,
+                };
+
+                if let Some(min_context_slot) = min_context_slot {
+                    if slot < min_context_slot {
+                        let error =
+                            RpcCustomError::MinContextSlotNotReached { context_slot: slot }.into();
+                        return Self::create_failure(jsonrpc, id, error);
+                    }
+                }
+
+                Self::create_success2(jsonrpc, id, slot)
+            }
+            RpcRequest::SolfeesSlots {
+                jsonrpc,
+                id,
+                filter,
+                frontend,
+            } => {
+                let outputs = slots_info.values().map(|info| info.get_filtered(&filter));
+                if frontend {
+                    Self::create_success(jsonrpc, id, outputs.collect::<Vec<_>>())
+                } else {
+                    match outputs
+                        .map(SolfeesPrioritizationFee::try_from)
+                        .collect::<Result<Vec<_>, JsonrpcError>>()
+                    {
+                        Ok(outputs) => Self::create_success(jsonrpc, id, outputs),
+                        Err(error) => Self::create_failure(jsonrpc, id, error),
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -1027,10 +1097,10 @@ pub struct RpcRequestsStats {
 }
 
 #[derive(Debug)]
-struct RpcRequests {
-    requests: Vec<RpcRequest>,
+struct RpcRequestTask {
+    request: RpcRequest,
     shutdown: Arc<AtomicBool>,
-    response_tx: oneshot::Sender<Vec<JsonrpcOutputArced>>,
+    tx: oneshot::Sender<JsonrpcOutputArced>,
 }
 
 #[derive(Debug)]
