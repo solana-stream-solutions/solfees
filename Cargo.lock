@@ -4640,7 +4640,6 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "bincode",
- "borsh 1.5.3",
  "cargo-lock",
  "clap 4.5.21",
  "futures",

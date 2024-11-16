@@ -4,23 +4,20 @@ use {
         schedule::{LeaderScheduleRpc, SolanaSchedule},
     },
     anyhow::Context,
-    borsh::de::BorshDeserialize,
     futures::stream::StreamExt,
     maplit::hashmap,
     serde::{Deserialize, Serialize},
-    solana_compute_budget::compute_budget_processor::{
-        DEFAULT_INSTRUCTION_COMPUTE_UNIT_LIMIT, MAX_COMPUTE_UNIT_LIMIT,
-    },
+    solana_compute_budget::compute_budget_processor::process_compute_budget_instructions,
     solana_sdk::{
         clock::{Epoch, Slot, UnixTimestamp},
         commitment_config::{CommitmentConfig, CommitmentLevel as CommitmentLevelSolana},
-        compute_budget::{self, ComputeBudgetInstruction},
         ed25519_program,
         hash::Hash,
         message::{AccountKeys, VersionedMessage},
         pubkey::Pubkey,
         secp256k1_program,
         signature::Signature,
+        transaction::TransactionError,
     },
     solana_transaction_status::{
         TransactionStatusMeta, TransactionWithStatusMeta, VersionedTransactionWithStatusMeta,
@@ -101,8 +98,8 @@ pub struct GeyserTransactionAccounts {
     pub fee_payer: Pubkey,
 }
 
-impl From<(VersionedMessage, TransactionStatusMeta)> for GeyserTransactionAccounts {
-    fn from((message, meta): (VersionedMessage, TransactionStatusMeta)) -> Self {
+impl From<(&VersionedMessage, &TransactionStatusMeta)> for GeyserTransactionAccounts {
+    fn from((message, meta): (&VersionedMessage, &TransactionStatusMeta)) -> Self {
         let header = message.header();
         let static_account_keys = message.static_account_keys();
 
@@ -112,41 +109,39 @@ impl From<(VersionedMessage, TransactionStatusMeta)> for GeyserTransactionAccoun
         let writable = meta
             .loaded_addresses
             .writable
-            .into_iter()
+            .iter()
             .chain(
                 static_account_keys[0..(header.num_required_signatures
                     - header.num_readonly_signed_accounts)
                     as usize]
-                    .iter()
-                    .copied(),
+                    .iter(),
             )
             .chain(
                 static_account_keys[header.num_required_signatures as usize
                     ..static_account_keys.len() - header.num_readonly_unsigned_accounts as usize]
-                    .iter()
-                    .copied(),
+                    .iter(),
             )
+            .copied()
             .collect::<HashSet<_>>();
 
         let readable = meta
             .loaded_addresses
             .readonly
-            .into_iter()
+            .iter()
             .chain(
                 static_account_keys[(header.num_required_signatures
                     - header.num_readonly_signed_accounts)
                     as usize
                     ..header.num_required_signatures as usize]
-                    .iter()
-                    .copied(),
+                    .iter(),
             )
             .chain(
                 static_account_keys[static_account_keys.len()
                     - header.num_readonly_unsigned_accounts as usize
                     ..static_account_keys.len()]
-                    .iter()
-                    .copied(),
+                    .iter(),
             )
+            .copied()
             .collect::<HashSet<_>>();
 
         let signers = static_account_keys[0..header.num_required_signatures as usize]
@@ -175,8 +170,10 @@ pub struct GeyserTransaction {
     pub fee: u64,
 }
 
-impl From<(VersionedTransactionWithStatusMeta, bool)> for GeyserTransaction {
-    fn from(
+impl TryFrom<(VersionedTransactionWithStatusMeta, bool)> for GeyserTransaction {
+    type Error = TransactionError;
+
+    fn try_from(
         (
             VersionedTransactionWithStatusMeta {
                 transaction: tx,
@@ -184,7 +181,7 @@ impl From<(VersionedTransactionWithStatusMeta, bool)> for GeyserTransaction {
             },
             is_vote,
         ): (VersionedTransactionWithStatusMeta, bool),
-    ) -> Self {
+    ) -> Result<Self, Self::Error> {
         // 1 SOL = 10^9 lamports
         // lamports per signature = 5_000
         // default: 200k CU per instruction, 1.4M per tx
@@ -196,55 +193,43 @@ impl From<(VersionedTransactionWithStatusMeta, bool)> for GeyserTransaction {
             Some(&meta.loaded_addresses),
         );
 
-        let mut unit_limit = None;
-        let mut unit_price = 0;
-        let mut ixs_count = 0;
-        let mut sigs_count = tx.signatures.len() as u32;
-        for ix in tx.message.instructions() {
-            if let Some(pubkey) = account_keys.get(ix.program_id_index as usize) {
-                match *pubkey {
-                    compute_budget::ID => {
-                        // We do not use `ComputeBudgetInstruction::try_from_slice(&ix.data)` because data can be longer than expected
-                        match <ComputeBudgetInstruction as BorshDeserialize>::deserialize(
-                            &mut ix.data.as_slice(),
-                        ) {
-                            Ok(ComputeBudgetInstruction::SetComputeUnitLimit(value)) => {
-                                unit_limit = Some(MAX_COMPUTE_UNIT_LIMIT.min(value));
-                            }
-                            Ok(ComputeBudgetInstruction::SetComputeUnitPrice(value)) => {
-                                unit_price = value;
-                            }
-                            _ => {}
-                        }
-                        continue;
-                    }
-                    ed25519_program::ID => {
-                        sigs_count += ix.data.first().copied().unwrap_or(0) as u32;
-                    }
-                    secp256k1_program::ID => {
-                        sigs_count += ix.data.first().copied().unwrap_or(0) as u32;
-                    }
-                    _ => {}
-                }
-            }
-            ixs_count += 1;
-        }
-        let unit_limit = unit_limit.unwrap_or_else(|| {
-            MAX_COMPUTE_UNIT_LIMIT.min(ixs_count * DEFAULT_INSTRUCTION_COMPUTE_UNIT_LIMIT)
-        });
-        let units_consumed = meta.compute_units_consumed;
-        let fee = meta.fee;
+        let instructions = tx
+            .message
+            .instructions()
+            .iter()
+            .map(|ix| {
+                account_keys
+                    .get(ix.program_id_index as usize)
+                    .ok_or(TransactionError::ProgramAccountNotFound)
+                    .map(|program_id| (program_id, ix))
+            })
+            .collect::<Result<Vec<_>, TransactionError>>()?;
 
-        Self {
+        let sigs_count = tx.signatures.len() as u32
+            + instructions
+                .iter()
+                .map(|(program_id, ix)| {
+                    match **program_id {
+                        ed25519_program::ID => ix.data.first().copied(),
+                        secp256k1_program::ID => ix.data.first().copied(),
+                        _ => None,
+                    }
+                    .unwrap_or(0) as u32
+                })
+                .sum::<u32>();
+
+        let computed_budget_limits = process_compute_budget_instructions(instructions.into_iter())?;
+
+        Ok(Self {
             signature: tx.signatures[0],
             vote: is_vote,
-            accounts: (tx.message, meta).into(),
+            accounts: (&tx.message, &meta).into(),
             sigs_count,
-            unit_limit,
-            unit_price,
-            units_consumed,
-            fee,
-        }
+            unit_limit: computed_budget_limits.compute_unit_limit,
+            unit_price: computed_budget_limits.compute_unit_price,
+            units_consumed: meta.compute_units_consumed,
+            fee: meta.fee,
+        })
     }
 }
 
@@ -434,7 +419,7 @@ fn parse_update_message(
                 .entry(info.slot)
                 .or_default()
                 .transactions
-                .push(GeyserTransaction::from((tx_with_meta, is_vote)));
+                .push(GeyserTransaction::try_from((tx_with_meta, is_vote))?);
             info.slot
         }
         UpdateOneof::BlockMeta(info) => {
