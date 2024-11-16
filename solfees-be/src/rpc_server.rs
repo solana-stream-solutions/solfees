@@ -158,9 +158,11 @@ pub async fn run_solfees(
                                 }),
                             ) {
                                 Ok((response, websocket)) => {
-                                    tokio::spawn(
-                                        solana_rpc.on_websocket(solana_rpc_mode, websocket),
-                                    );
+                                    tokio::spawn(solana_rpc.on_websocket(
+                                        client_id,
+                                        solana_rpc_mode,
+                                        websocket,
+                                    ));
                                     let (parts, body) = response.into_parts();
                                     Ok(Response::from_parts(parts, body.boxed()))
                                 }

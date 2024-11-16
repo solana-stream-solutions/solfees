@@ -585,7 +585,12 @@ impl SolanaRpc {
         })
     }
 
-    pub async fn on_websocket(self, mode: SolanaRpcMode, websocket: HyperWebsocket) {
+    pub async fn on_websocket(
+        self,
+        client_id: ClientId,
+        mode: SolanaRpcMode,
+        websocket: HyperWebsocket,
+    ) {
         let ws_frontend = match mode {
             SolanaRpcMode::Solfees => false,
             SolanaRpcMode::SolfeesFrontend => true,
@@ -655,6 +660,7 @@ impl SolanaRpc {
                         break Some(Some("received invalid message"));
                     };
 
+                    let timer = client_id.start_timer();
                     match call.method.as_str() {
                         "SlotsSubscribe" => {
                             let output = match call.params.parse().and_then(|config: ReqParamsSlotsSubscribeConfig| {
@@ -670,10 +676,12 @@ impl SolanaRpc {
                         },
                         _ => break Some(Some("unknown subscription method")),
                     }
+                    timer.stop_and_record();
                 },
 
                 maybe_update = updates_rx.recv() => match maybe_update {
                     Ok(update) => if let Some((id, filter)) = filter.as_ref() {
+                        let timer = client_id.start_timer();
                         let output = match update.as_ref() {
                             StreamsUpdateMessage::Status { slot, commitment } => {
                                 SlotsSubscribeOutput::Status {
@@ -689,6 +697,7 @@ impl SolanaRpc {
                             Self::create_success2(None, id.clone(), SlotsSubscribeOutputSolana::from(output))
                         };
                         websocket_tx_message = Some(WebSocketMessage::Text(serde_json::to_string(&message).expect("failed to serialize")));
+                        timer.stop_and_record();
                     }
                     Err(broadcast::error::RecvError::Closed) => break Some(None),
                     Err(broadcast::error::RecvError::Lagged(_)) => break Some(Some("subscription lagged")),
