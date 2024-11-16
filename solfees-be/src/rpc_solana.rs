@@ -1,7 +1,7 @@
 use {
     crate::{
         grpc_geyser::{CommitmentLevel, GeyserMessage, GeyserTransaction},
-        metrics::solfees_be as metrics,
+        metrics::solfees_be::{self as metrics, ClientId},
         redis::RedisMessage,
     },
     futures::{
@@ -189,10 +189,12 @@ impl SolanaRpc {
 
     pub async fn on_request(
         &self,
+        client_id: ClientId,
         mode: SolanaRpcMode,
         body: impl Buf,
         mut shutdown_rx: broadcast::Receiver<()>,
     ) -> anyhow::Result<(RpcRequestsStats, Vec<u8>)> {
+        let timer = client_id.start_timer();
         let mut stats = RpcRequestsStats::default();
 
         #[derive(Debug, Deserialize)]
@@ -503,6 +505,7 @@ impl SolanaRpc {
                 }
             }
         }
+        timer.stop_and_record();
 
         if !requests.is_empty() {
             let shutdown = Arc::new(AtomicBool::new(false));
@@ -511,6 +514,7 @@ impl SolanaRpc {
             for request in requests {
                 let (tx, rx) = oneshot::channel();
                 match self.requests_tx.try_send(RpcRequestTask {
+                    client_id: client_id.clone(),
                     request,
                     shutdown: Arc::clone(&shutdown),
                     tx,
@@ -557,6 +561,7 @@ impl SolanaRpc {
         }
 
         anyhow::ensure!(calls_total == outputs.len(), "invalid number of outputs");
+        let _timer = client_id.start_timer();
         match outputs
             .into_iter()
             .map(|output| output.ok_or(()))
@@ -850,6 +855,7 @@ impl SolanaRpc {
                     Some(task) => {
                         metrics::requests_queue_size_dec();
                         if !task.shutdown.load(Ordering::Relaxed) {
+                            let timer = task.client_id.start_timer();
                             let _ = task.tx.send(Self::handle_request_task(
                                 task.request,
                                 &latest_blockhash_storage,
@@ -858,6 +864,7 @@ impl SolanaRpc {
                                 &leader_schedule_map_solfees,
                                 &leader_schedule_map_rpc
                             ));
+                            timer.stop_and_record();
                         }
                     },
                     None => break,
@@ -1098,6 +1105,7 @@ pub struct RpcRequestsStats {
 
 #[derive(Debug)]
 struct RpcRequestTask {
+    client_id: ClientId,
     request: RpcRequest,
     shutdown: Arc<AtomicBool>,
     tx: oneshot::Sender<JsonrpcOutputArced>,

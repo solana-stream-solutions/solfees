@@ -113,6 +113,7 @@ pub async fn run_solfees(
                         }
                     };
 
+                    let client_id = metrics_be::ClientId::new(req.headers());
                     match req_type {
                         ReqType::Rpc => {
                             let ts = Instant::now();
@@ -121,6 +122,7 @@ pub async fn run_solfees(
                                 .map_err(|error| anyhow::anyhow!(error))
                                 .and_then(|body| {
                                     solana_rpc.on_request(
+                                        client_id,
                                         solana_rpc_mode,
                                         body.aggregate(),
                                         shutdown_rx,

@@ -27,5 +27,6 @@ The minor version will be incremented upon a breaking change and the patch versi
 - geyser: use process_compute_budget_instructions ([#15](https://github.com/solana-stream-solutions/solfees/pull/15))
 - api: improve parallelism ([#16](https://github.com/solana-stream-solutions/solfees/pull/16))
 - geyser: do not stream outdated data ([#17](https://github.com/solana-stream-solutions/solfees/pull/17))
+- api: add metrics of used resources ([#18](https://github.com/solana-stream-solutions/solfees/pull/18))
 
 ### Breaking
