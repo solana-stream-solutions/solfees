@@ -58,19 +58,30 @@ pub mod grpc2redis {
     };
 
     lazy_static::lazy_static! {
+        static ref GRPC_BLOCK_BUILD_FAILED: IntCounter = IntCounter::new(
+            "grpc_block_build_failed_total", "Total number of unsuccessful block builds"
+        ).unwrap();
+
         static ref REDIS_SLOT_PUSHED: IntGaugeVec = IntGaugeVec::new(
             Opts::new("redis_slot_pushed", "Slot pushed to Redis by commitment"),
             &["commitment"]
         ).unwrap();
 
-        static ref REDIS_MESSAGES_PUSHED: IntCounter = IntCounter::new("redis_messages_pushed", "Number of messages pushed to Redis stream").unwrap();
+        static ref REDIS_MESSAGES_PUSHED: IntCounter = IntCounter::new(
+            "redis_messages_pushed_total", "Number of messages pushed to Redis stream"
+        ).unwrap();
     }
 
     pub fn init() {
         init2();
 
+        register!(GRPC_BLOCK_BUILD_FAILED);
         register!(REDIS_SLOT_PUSHED);
         register!(REDIS_MESSAGES_PUSHED);
+    }
+
+    pub fn grpc_block_build_failed_inc() {
+        GRPC_BLOCK_BUILD_FAILED.inc();
     }
 
     pub fn redis_slot_pushed_set(commitment: CommitmentLevel, slot: Slot) {

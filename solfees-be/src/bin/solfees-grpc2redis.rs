@@ -9,6 +9,7 @@ use {
         grpc_geyser::{self, GeyserMessage},
         metrics::grpc2redis as metrics,
         rpc_server,
+        schedule::LeaderScheduleRpc,
     },
     std::{sync::Arc, time::Duration},
     tokio::{signal::unix::SignalKind, sync::Notify},
@@ -51,7 +52,7 @@ async fn main2(config: Config) -> anyhow::Result<()> {
                 .with_context(|| format!("failed to deserialie epoch {epoch}"))
                 .map(|schedule| (epoch, schedule))
         })
-        .collect::<Result<Vec<_>, _>>()?;
+        .collect::<Result<Vec<(Epoch, LeaderScheduleRpc)>, _>>()?;
 
     let (mut geyser_rx, mut schedule_rx) = grpc_geyser::subscribe(
         config.grpc.endpoint,
@@ -111,6 +112,7 @@ async fn main2(config: Config) -> anyhow::Result<()> {
             }
         };
 
+        // trying to fetch all messages
         while let Ok(maybe_message) = geyser_rx.try_recv() {
             messages.push(maybe_message?);
         }

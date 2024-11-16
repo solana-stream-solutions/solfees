@@ -140,7 +140,7 @@ impl SolanaRpc {
         streams_channel_capacity: usize,
         pool_size: usize,
     ) -> (Self, Vec<BoxFuture<'static, anyhow::Result<()>>>) {
-        const REDIS_CHANNEL_SIZE: usize = 1_024;
+        const REDIS_CHANNEL_SIZE: usize = 2_048;
 
         let (redis_tx, _redis_rx) = broadcast::channel(REDIS_CHANNEL_SIZE);
         let (streams_tx, _streams_rx) = broadcast::channel(streams_channel_capacity);
@@ -156,10 +156,13 @@ impl SolanaRpc {
             streams_tx: streams_tx.clone(),
         };
 
-        let mut futs =
-            vec![Self::run_subscribe_update_loop(redis_tx.subscribe(), streams_tx).boxed()];
+        let mut futs = vec![
+            // WebSocket source
+            Self::run_subscribe_update_loop(redis_tx.subscribe(), streams_tx).boxed(),
+        ];
         for (index, ()) in std::iter::repeat(()).take(pool_size).enumerate() {
             futs.push(
+                // RPC handler
                 Self::run_request_update_loop(
                     index,
                     redis_tx.subscribe(),
@@ -337,7 +340,7 @@ impl SolanaRpc {
                                         id: call.id.clone(),
                                         slot: None,
                                         epoch: Some(epoch),
-                                        commitment: CommitmentLevel::default(),
+                                        commitment: CommitmentLevel::Confirmed,
                                         identity: None,
                                     }
                                 },
@@ -1173,8 +1176,14 @@ impl StreamsSlotInfo {
         let mut fees = Vec::with_capacity(self.transactions.len());
         for transaction in self.transactions.iter().filter(|tx| {
             !tx.vote
-                && SlotSubscribeFilter::filter_pubkeys(&filter.read_write, &tx.accounts.writable)
-                && SlotSubscribeFilter::filter_pubkeys(&filter.read_only, &tx.accounts.readable)
+                && filter
+                    .read_write
+                    .iter()
+                    .all(|pubkey| tx.accounts.writable.contains(pubkey))
+                && filter
+                    .read_only
+                    .iter()
+                    .all(|pubkey| tx.accounts.readable.contains(pubkey))
         }) {
             fees.push(transaction.unit_price);
         }
@@ -1356,15 +1365,6 @@ impl TryFrom<ReqParamsSlotsSubscribeConfig> for SlotSubscribeFilter {
             read_only,
             levels: config.levels,
         })
-    }
-}
-
-impl SlotSubscribeFilter {
-    fn filter_pubkeys(required: &[Pubkey], pubkeys: &[Pubkey]) -> bool {
-        required.is_empty()
-            || required
-                .iter()
-                .all(|pubkey| pubkeys.binary_search(pubkey).is_ok())
     }
 }
 

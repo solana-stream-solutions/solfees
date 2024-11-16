@@ -151,7 +151,7 @@ pub async fn run_solfees(
                             match hyper_tungstenite::upgrade(
                                 &mut req,
                                 Some(WebSocketConfig {
-                                    max_message_size: Some(64 * 1024), // max incoming message size: 64KiB
+                                    max_message_size: Some(body_limit), // max incoming message size
                                     ..Default::default()
                                 }),
                             ) {

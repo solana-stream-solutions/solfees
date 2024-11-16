@@ -29,7 +29,7 @@ where
     for<'a> S: LookupSpan<'a>,
 {
     let is_atty = io::stdout().is_terminal() && io::stderr().is_terminal();
-    let io_layer = layer().with_ansi(is_atty);
+    let io_layer = layer().with_ansi(is_atty).with_line_number(true);
 
     if json {
         Box::new(io_layer.json())

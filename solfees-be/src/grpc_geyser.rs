@@ -1,25 +1,23 @@
 use {
-    crate::schedule::{LeaderScheduleRpc, SolanaSchedule},
+    crate::{
+        metrics::grpc2redis as metrics,
+        schedule::{LeaderScheduleRpc, SolanaSchedule},
+    },
     anyhow::Context,
-    borsh::de::BorshDeserialize,
     futures::stream::StreamExt,
     maplit::hashmap,
     serde::{Deserialize, Serialize},
-    solana_compute_budget::compute_budget_processor::{
-        DEFAULT_INSTRUCTION_COMPUTE_UNIT_LIMIT, MAX_COMPUTE_UNIT_LIMIT,
-    },
+    solana_compute_budget::compute_budget_processor::process_compute_budget_instructions,
     solana_sdk::{
         clock::{Epoch, Slot, UnixTimestamp},
-        commitment_config::{
-            CommitmentConfig as SolanaCommitmentConfig, CommitmentLevel as SolanaCommitmentLevel,
-        },
-        compute_budget::{self, ComputeBudgetInstruction},
+        commitment_config::{CommitmentConfig, CommitmentLevel as CommitmentLevelSolana},
         ed25519_program,
         hash::Hash,
         message::{AccountKeys, VersionedMessage},
         pubkey::Pubkey,
         secp256k1_program,
         signature::Signature,
+        transaction::TransactionError,
     },
     solana_transaction_status::{
         TransactionStatusMeta, TransactionWithStatusMeta, VersionedTransactionWithStatusMeta,
@@ -33,47 +31,51 @@ use {
         codec::CompressionEncoding,
         metadata::{errors::InvalidMetadataValue, AsciiMetadataValue},
         transport::channel::ClientTlsConfig,
+        Status,
     },
-    tracing::{error, info},
+    tracing::error,
     yellowstone_grpc_client::GeyserGrpcClient,
-    yellowstone_grpc_proto::prelude::{
-        self as proto, subscribe_update::UpdateOneof, SubscribeRequest,
-        SubscribeRequestFilterBlocksMeta, SubscribeRequestFilterSlots,
-        SubscribeRequestFilterTransactions, SubscribeUpdateBlockMeta,
+    yellowstone_grpc_proto::{
+        convert_from,
+        prelude::{
+            subscribe_update::UpdateOneof, CommitmentLevel as CommitmentLevelProto,
+            SubscribeRequest, SubscribeRequestFilterBlocksMeta, SubscribeRequestFilterSlots,
+            SubscribeRequestFilterTransactions, SubscribeUpdate, SubscribeUpdateBlockMeta,
+        },
     },
 };
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum CommitmentLevel {
+    #[default]
     Processed,
     Confirmed,
-    #[default]
     Finalized,
 }
 
-impl From<proto::CommitmentLevel> for CommitmentLevel {
-    fn from(commitment: proto::CommitmentLevel) -> Self {
+impl From<CommitmentLevelProto> for CommitmentLevel {
+    fn from(commitment: CommitmentLevelProto) -> Self {
         match commitment {
-            proto::CommitmentLevel::Processed => Self::Processed,
-            proto::CommitmentLevel::Confirmed => Self::Confirmed,
-            proto::CommitmentLevel::Finalized => Self::Finalized,
+            CommitmentLevelProto::Processed => Self::Processed,
+            CommitmentLevelProto::Confirmed => Self::Confirmed,
+            CommitmentLevelProto::Finalized => Self::Finalized,
         }
     }
 }
 
-impl From<SolanaCommitmentConfig> for CommitmentLevel {
-    fn from(commitment: SolanaCommitmentConfig) -> Self {
+impl From<CommitmentConfig> for CommitmentLevel {
+    fn from(commitment: CommitmentConfig) -> Self {
         commitment.commitment.into()
     }
 }
 
-impl From<SolanaCommitmentLevel> for CommitmentLevel {
-    fn from(commitment: SolanaCommitmentLevel) -> Self {
+impl From<CommitmentLevelSolana> for CommitmentLevel {
+    fn from(commitment: CommitmentLevelSolana) -> Self {
         match commitment {
-            SolanaCommitmentLevel::Processed => Self::Processed,
-            SolanaCommitmentLevel::Confirmed => Self::Confirmed,
-            SolanaCommitmentLevel::Finalized => Self::Finalized,
+            CommitmentLevelSolana::Processed => Self::Processed,
+            CommitmentLevelSolana::Confirmed => Self::Confirmed,
+            CommitmentLevelSolana::Finalized => Self::Finalized,
         }
     }
 }
@@ -90,73 +92,62 @@ impl CommitmentLevel {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct GeyserTransactionAccounts {
-    pub writable: Vec<Pubkey>,
-    pub readable: Vec<Pubkey>,
-    pub signers: Vec<Pubkey>,
+    pub writable: HashSet<Pubkey>,
+    pub readable: HashSet<Pubkey>,
+    pub signers: HashSet<Pubkey>,
     pub fee_payer: Pubkey,
 }
 
-impl From<(VersionedMessage, TransactionStatusMeta)> for GeyserTransactionAccounts {
-    fn from((message, meta): (VersionedMessage, TransactionStatusMeta)) -> Self {
+impl From<(&VersionedMessage, &TransactionStatusMeta)> for GeyserTransactionAccounts {
+    fn from((message, meta): (&VersionedMessage, &TransactionStatusMeta)) -> Self {
         let header = message.header();
         let static_account_keys = message.static_account_keys();
 
         // See details in `solana_program`:
         // https://docs.rs/solana-program/2.0.8/src/solana_program/message/compiled_keys.rs.html#103-113
 
-        let mut writable = meta
+        let writable = meta
             .loaded_addresses
             .writable
-            .into_iter()
+            .iter()
             .chain(
                 static_account_keys[0..(header.num_required_signatures
                     - header.num_readonly_signed_accounts)
                     as usize]
-                    .iter()
-                    .copied(),
+                    .iter(),
             )
             .chain(
                 static_account_keys[header.num_required_signatures as usize
                     ..static_account_keys.len() - header.num_readonly_unsigned_accounts as usize]
-                    .iter()
-                    .copied(),
+                    .iter(),
             )
-            .collect::<HashSet<_>>()
-            .into_iter()
-            .collect::<Vec<_>>();
-        writable.sort_unstable();
+            .copied()
+            .collect::<HashSet<_>>();
 
-        let mut readable = meta
+        let readable = meta
             .loaded_addresses
             .readonly
-            .into_iter()
+            .iter()
             .chain(
                 static_account_keys[(header.num_required_signatures
                     - header.num_readonly_signed_accounts)
                     as usize
                     ..header.num_required_signatures as usize]
-                    .iter()
-                    .copied(),
+                    .iter(),
             )
             .chain(
                 static_account_keys[static_account_keys.len()
                     - header.num_readonly_unsigned_accounts as usize
                     ..static_account_keys.len()]
-                    .iter()
-                    .copied(),
+                    .iter(),
             )
-            .collect::<HashSet<_>>()
-            .into_iter()
-            .collect::<Vec<_>>();
-        readable.sort_unstable();
+            .copied()
+            .collect::<HashSet<_>>();
 
-        let mut signers = static_account_keys[0..header.num_required_signatures as usize]
+        let signers = static_account_keys[0..header.num_required_signatures as usize]
             .iter()
             .copied()
-            .collect::<HashSet<_>>()
-            .into_iter()
-            .collect::<Vec<_>>();
-        signers.sort_unstable();
+            .collect::<HashSet<_>>();
 
         Self {
             writable,
@@ -179,8 +170,10 @@ pub struct GeyserTransaction {
     pub fee: u64,
 }
 
-impl From<(VersionedTransactionWithStatusMeta, bool)> for GeyserTransaction {
-    fn from(
+impl TryFrom<(VersionedTransactionWithStatusMeta, bool)> for GeyserTransaction {
+    type Error = TransactionError;
+
+    fn try_from(
         (
             VersionedTransactionWithStatusMeta {
                 transaction: tx,
@@ -188,7 +181,7 @@ impl From<(VersionedTransactionWithStatusMeta, bool)> for GeyserTransaction {
             },
             is_vote,
         ): (VersionedTransactionWithStatusMeta, bool),
-    ) -> Self {
+    ) -> Result<Self, Self::Error> {
         // 1 SOL = 10^9 lamports
         // lamports per signature = 5_000
         // default: 200k CU per instruction, 1.4M per tx
@@ -200,54 +193,57 @@ impl From<(VersionedTransactionWithStatusMeta, bool)> for GeyserTransaction {
             Some(&meta.loaded_addresses),
         );
 
-        let mut unit_limit = None;
-        let mut unit_price = 0;
-        let mut ixs_count = 0;
-        let mut sigs_count = tx.signatures.len() as u32;
-        for ix in tx.message.instructions() {
-            if let Some(pubkey) = account_keys.get(ix.program_id_index as usize) {
-                match *pubkey {
-                    compute_budget::ID => {
-                        // We do not use `ComputeBudgetInstruction::try_from_slice(&ix.data)` because data can be longer than expected
-                        match <ComputeBudgetInstruction as BorshDeserialize>::deserialize(
-                            &mut ix.data.as_slice(),
-                        ) {
-                            Ok(ComputeBudgetInstruction::SetComputeUnitLimit(value)) => {
-                                unit_limit = Some(MAX_COMPUTE_UNIT_LIMIT.min(value));
-                            }
-                            Ok(ComputeBudgetInstruction::SetComputeUnitPrice(value)) => {
-                                unit_price = value;
-                            }
-                            _ => {}
-                        }
-                        continue;
-                    }
-                    ed25519_program::ID => {
-                        sigs_count += ix.data.first().copied().unwrap_or(0) as u32;
-                    }
-                    secp256k1_program::ID => {
-                        sigs_count += ix.data.first().copied().unwrap_or(0) as u32;
-                    }
-                    _ => {}
-                }
-            }
-            ixs_count += 1;
-        }
-        let unit_limit = unit_limit.unwrap_or_else(|| {
-            MAX_COMPUTE_UNIT_LIMIT.min(ixs_count * DEFAULT_INSTRUCTION_COMPUTE_UNIT_LIMIT)
-        });
-        let units_consumed = meta.compute_units_consumed;
-        let fee = meta.fee;
+        let instructions = tx
+            .message
+            .instructions()
+            .iter()
+            .map(|ix| {
+                account_keys
+                    .get(ix.program_id_index as usize)
+                    .ok_or(TransactionError::ProgramAccountNotFound)
+                    .map(|program_id| (program_id, ix))
+            })
+            .collect::<Result<Vec<_>, TransactionError>>()?;
 
-        Self {
+        let sigs_count = tx.signatures.len() as u32
+            + instructions
+                .iter()
+                .map(|(program_id, ix)| {
+                    match **program_id {
+                        ed25519_program::ID => ix.data.first().copied(),
+                        secp256k1_program::ID => ix.data.first().copied(),
+                        _ => None,
+                    }
+                    .unwrap_or(0) as u32
+                })
+                .sum::<u32>();
+
+        let computed_budget_limits = process_compute_budget_instructions(instructions.into_iter())?;
+
+        Ok(Self {
             signature: tx.signatures[0],
             vote: is_vote,
-            accounts: (tx.message, meta).into(),
+            accounts: (&tx.message, &meta).into(),
             sigs_count,
-            unit_limit,
-            unit_price,
-            units_consumed,
-            fee,
+            unit_limit: computed_budget_limits.compute_unit_limit,
+            unit_price: computed_budget_limits.compute_unit_price,
+            units_consumed: meta.compute_units_consumed,
+            fee: meta.fee,
+        })
+    }
+}
+
+#[derive(Debug)]
+struct BlockInfo {
+    meta: Option<SubscribeUpdateBlockMeta>,
+    transactions: Vec<GeyserTransaction>,
+}
+
+impl Default for BlockInfo {
+    fn default() -> Self {
+        Self {
+            meta: None,
+            transactions: Vec::with_capacity(8192),
         }
     }
 }
@@ -272,54 +268,33 @@ pub enum GeyserMessage {
 
 impl GeyserMessage {
     fn build_block(leader: Option<Pubkey>, block_info: BlockInfo) -> anyhow::Result<GeyserMessage> {
-        let Some(info) = block_info.meta else {
+        let Some(meta) = block_info.meta else {
             anyhow::bail!("failed to get block meta");
         };
 
         Ok(GeyserMessage::Slot {
             leader,
-            slot: info.slot,
-            hash: info
+            slot: meta.slot,
+            hash: meta
                 .blockhash
                 .parse()
                 .context("failed to parse block hash")?,
-            time: info
+            time: meta
                 .block_time
                 .map(|ut| ut.timestamp)
                 .ok_or(anyhow::anyhow!("failed to get block time"))?,
-            height: info
+            height: meta
                 .block_height
                 .map(|bh| bh.block_height)
                 .ok_or(anyhow::anyhow!("failed to get block height"))?,
-            parent_slot: info.parent_slot,
-            parent_hash: info
+            parent_slot: meta.parent_slot,
+            parent_hash: meta
                 .parent_blockhash
                 .parse()
                 .context("failed to parse parent block hash")?,
             transactions: Arc::new(block_info.transactions),
         })
     }
-}
-
-#[derive(Debug)]
-struct BlockInfo {
-    meta: Option<SubscribeUpdateBlockMeta>,
-    transactions: Vec<GeyserTransaction>,
-}
-
-impl Default for BlockInfo {
-    fn default() -> Self {
-        Self {
-            meta: None,
-            transactions: Vec::with_capacity(8192),
-        }
-    }
-}
-
-#[derive(Debug)]
-enum MaybeGeyserMessage {
-    Geyser(GeyserMessage),
-    Block(Slot),
 }
 
 pub async fn subscribe<T>(
@@ -339,7 +314,7 @@ where
         .tls_config(ClientTlsConfig::new().with_native_roots())?
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(128 * 1024 * 1024) // 128MiB, BlockMeta with rewards can be bigger than 60MiB
+        .max_decoding_message_size(256 * 1024 * 1024) // 256MiB, BlockMeta with rewards can be bigger than 60MiB
         .connect()
         .await?
         .subscribe_once(SubscribeRequest {
@@ -357,7 +332,7 @@ where
             entry: HashMap::new(),
             blocks: HashMap::new(),
             blocks_meta: hashmap! { "".to_owned() => SubscribeRequestFilterBlocksMeta {} },
-            commitment: Some(proto::CommitmentLevel::Processed as i32),
+            commitment: Some(CommitmentLevelProto::Processed as i32),
             accounts_data_slice: vec![],
             ping: None,
         })
@@ -367,114 +342,108 @@ where
     let (tx, rx) = mpsc::unbounded_channel();
     let (schedule, schedule_rx) = SolanaSchedule::new(rpc_endpoint, saved_epochs);
     tokio::spawn(async move {
-        let mut slot_processed_first = None;
         let mut blocks = BTreeMap::<Slot, BlockInfo>::new();
 
         let mut alive = true;
         while alive {
-            let msg = match stream.next().await.map(|m| m.map(|m| m.update_oneof)) {
-                Some(Ok(Some(UpdateOneof::Slot(info)))) => {
-                    proto::CommitmentLevel::try_from(info.status)
-                        .map(|commitment| {
-                            let commitment = CommitmentLevel::from(commitment);
-                            if commitment == CommitmentLevel::Processed {
-                                if slot_processed_first.is_none() {
-                                    slot_processed_first = Some(info.slot);
-                                    info!(slot = info.slot, "received first processed slot");
-                                }
-                            } else if commitment == CommitmentLevel::Finalized {
-                                loop {
-                                    match blocks.first_key_value() {
-                                        Some((block_info_slot, block_info))
-                                            if *block_info_slot < info.slot =>
-                                        {
-                                            if let Some(meta) = &block_info.meta {
-                                                if Some(*block_info_slot) != slot_processed_first {
-                                                    error!(
-                                                        slot = block_info_slot,
-                                                        executed_transaction_count =
-                                                            meta.executed_transaction_count,
-                                                        transactions =
-                                                            block_info.transactions.len(),
-                                                        "failed to build block"
-                                                    );
-                                                }
-                                            }
-                                            blocks.pop_first();
-                                        }
-                                        _ => break,
-                                    }
-                                }
-                            }
-
-                            MaybeGeyserMessage::Geyser(GeyserMessage::Status {
-                                slot: info.slot,
-                                commitment,
-                            })
-                        })
-                        .map_err(|_error| anyhow::anyhow!("invalid commitment"))
-                }
-                Some(Ok(Some(UpdateOneof::Transaction(info)))) => match info.transaction.map(|tx| {
-                    (
-                        tx.is_vote,
-                        yellowstone_grpc_proto::convert_from::create_tx_with_meta(tx),
-                    )
-                }) {
-                    Some((is_vote, Ok(TransactionWithStatusMeta::Complete(tx_with_meta)))) => {
-                        blocks
-                            .entry(info.slot)
-                            .or_default()
-                            .transactions
-                            .push(GeyserTransaction::from((tx_with_meta, is_vote)));
-                        Ok(MaybeGeyserMessage::Block(info.slot))
-                    }
-                    Some((_is_vote, Ok(TransactionWithStatusMeta::MissingMetadata(_)))) => {
-                        Err("failed to get transaction metadata".to_owned())
-                    }
-                    Some((_is_vote, Err(error))) => {
-                        Err(format!("failed to decode transaction: {error}"))
-                    }
-                    None => Err("failed to get transaction".to_owned()),
-                }
-                .map_err(|err| anyhow::anyhow!(err)),
-                Some(Ok(Some(UpdateOneof::BlockMeta(info)))) => {
-                    let slot = info.slot;
-                    blocks.entry(slot).or_default().meta = Some(info);
-                    Ok(MaybeGeyserMessage::Block(slot))
-                }
-                Some(Ok(_)) => {
-                    continue;
-                }
-                Some(Err(error)) => Err(error.into()),
-                None => Err(anyhow::anyhow!("stream finished")),
-            };
-
-            let msg = match msg {
-                Ok(MaybeGeyserMessage::Geyser(msg)) => Ok(msg),
-                Ok(MaybeGeyserMessage::Block(slot)) => {
-                    if let btree_map::Entry::Occupied(entry) = blocks.entry(slot) {
-                        let info = entry.get();
-                        if info.meta.as_ref().map(|m| m.executed_transaction_count)
-                            == Some(info.transactions.len() as u64)
-                        {
-                            let leader = schedule.get_leader(slot);
-                            GeyserMessage::build_block(leader, entry.remove())
-                        } else {
-                            continue;
-                        }
-                    } else {
-                        continue;
-                    }
-                }
+            let msg = match parse_update_message(stream.next().await, &mut blocks, &schedule) {
+                Ok(Some(msg)) => Ok(msg),
+                Ok(None) => continue,
                 Err(error) => Err(error),
             };
 
             alive = msg.is_ok();
             if tx.send(msg).is_err() {
-                break;
+                alive = false;
             }
         }
     });
 
     Ok((rx, schedule_rx))
+}
+
+fn parse_update_message(
+    msg: Option<Result<SubscribeUpdate, Status>>,
+    blocks: &mut BTreeMap<Slot, BlockInfo>,
+    schedule: &SolanaSchedule,
+) -> anyhow::Result<Option<GeyserMessage>> {
+    let slot = match msg
+        .map(|m| m.map(|m| m.update_oneof))
+        .ok_or(anyhow::anyhow!("gRPC stream finished"))??
+        .ok_or(anyhow::anyhow!("no update message"))?
+    {
+        UpdateOneof::Slot(info) => {
+            let commitment = CommitmentLevelProto::try_from(info.status)
+                .map_err(|_error| anyhow::anyhow!("failed to parse commitment level"))?
+                .into();
+
+            if commitment == CommitmentLevel::Finalized {
+                loop {
+                    match blocks.first_key_value() {
+                        Some((block_info_slot, block_info)) if *block_info_slot < info.slot => {
+                            if let Some(meta) = &block_info.meta {
+                                error!(
+                                    slot = block_info_slot,
+                                    executed_transaction_count = meta.executed_transaction_count,
+                                    transactions = block_info.transactions.len(),
+                                    "failed to build block"
+                                );
+                                metrics::grpc_block_build_failed_inc();
+                            }
+                            blocks.pop_first();
+                        }
+                        _ => break,
+                    }
+                }
+            }
+
+            return Ok(Some(GeyserMessage::Status {
+                slot: info.slot,
+                commitment,
+            }));
+        }
+        UpdateOneof::Transaction(info) => {
+            let tx = info
+                .transaction
+                .ok_or(anyhow::anyhow!("failed to get transaction"))?;
+
+            let is_vote = tx.is_vote;
+            let TransactionWithStatusMeta::Complete(tx_with_meta) =
+                convert_from::create_tx_with_meta(tx)
+                    .map_err(|error| anyhow::anyhow!("failed to decode transaction: {error}"))?
+            else {
+                anyhow::bail!("failed to get transaction metadata");
+            };
+
+            blocks
+                .entry(info.slot)
+                .or_default()
+                .transactions
+                .push(GeyserTransaction::try_from((tx_with_meta, is_vote))?);
+            info.slot
+        }
+        UpdateOneof::BlockMeta(info) => {
+            let slot = info.slot;
+            blocks.entry(slot).or_default().meta = Some(info);
+            slot
+        }
+        UpdateOneof::Ping(_) => return Ok(None),
+        _ => anyhow::bail!("received unexpected message"),
+    };
+
+    Ok(
+        if let btree_map::Entry::Occupied(entry) = blocks.entry(slot) {
+            let info = entry.get();
+            if info.meta.as_ref().map(|m| m.executed_transaction_count)
+                == Some(info.transactions.len() as u64)
+            {
+                let leader = schedule.get_leader(slot);
+                Some(GeyserMessage::build_block(leader, entry.remove())?)
+            } else {
+                None
+            }
+        } else {
+            None
+        },
+    )
 }

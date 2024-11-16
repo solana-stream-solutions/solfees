@@ -19,7 +19,9 @@ use {
     tracing::{error, info},
 };
 
-type LeaderScheduleByEpoch = HashMap<Epoch, Option<LeadersSchedule>>;
+pub type LeaderScheduleRpc = HashMap<String, Vec<usize>>;
+
+pub type LeaderScheduleByEpoch = HashMap<Epoch, Option<LeadersSchedule>>;
 
 pub struct SolanaSchedule {
     rpc: Arc<RpcClient>,
@@ -112,8 +114,6 @@ impl SolanaSchedule {
         Ok(())
     }
 }
-
-pub type LeaderScheduleRpc = HashMap<String, Vec<usize>>;
 
 #[derive(Debug)]
 pub struct LeadersSchedule {
