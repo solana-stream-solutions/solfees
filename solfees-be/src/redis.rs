@@ -5,7 +5,6 @@ use {
         schedule::{LeaderScheduleRpc, LeadersSchedule, LeadersScheduleSolfees},
     },
     anyhow::Context,
-    jsonrpc_core::Value as JsonrpcValue,
     lru::LruCache,
     redis::{streams::StreamReadReply, AsyncConnectionConfig, Client, Value as RedisValue},
     solana_sdk::{clock::Epoch, epoch_schedule::EpochSchedule},
@@ -18,8 +17,8 @@ pub enum RedisMessage {
     Geyser(GeyserMessage),
     Epoch {
         epoch: Epoch,
-        leader_schedule_solfees: Arc<JsonrpcValue>, // serialized `LeadersScheduleSolfees`
-        leader_schedule_rpc: Arc<JsonrpcValue>,     // serialized `HashMap<String, Vec<usize>>`
+        leader_schedule_solfees: Arc<serde_json::Value>, // serialized `LeadersScheduleSolfees`
+        leader_schedule_rpc: Arc<serde_json::Value>,     // serialized `HashMap<String, Vec<usize>>`
     },
 }
 

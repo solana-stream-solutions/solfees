@@ -168,7 +168,7 @@ impl Default for ConfigListenRpc {
     fn default() -> Self {
         Self {
             bind: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8000),
-            body_limit: 16 * 1024,
+            body_limit: 16 * 1024, // 16 KiB
             request_calls_max: 5,
             request_timeout: Duration::from_secs(60),
             request_queue_max: 5_000,
@@ -176,15 +176,6 @@ impl Default for ConfigListenRpc {
             pool_size: 2,
         }
     }
-}
-
-fn deserialize_humansize<'de, D>(deserializer: D) -> Result<usize, D::Error>
-where
-    D: de::Deserializer<'de>,
-{
-    let value = String::deserialize(deserializer)?;
-    let size = Size::from_str(&value).map_err(de::Error::custom)?;
-    Ok(size.to_bytes() as usize)
 }
 
 fn deserialize_maybe_env<'de, T, D>(deserializer: D) -> Result<T, D::Error>
@@ -195,9 +186,9 @@ where
 {
     #[derive(Debug, PartialEq, Eq, Deserialize)]
     #[serde(untagged)]
-    enum MaybeEnv<V> {
+    enum MaybeEnv<'a, V> {
         Value(V),
-        Env { env: String },
+        Env { env: &'a str },
     }
 
     match MaybeEnv::deserialize(deserializer)? {
@@ -217,9 +208,9 @@ where
 {
     #[derive(Debug, PartialEq, Eq, Deserialize)]
     #[serde(untagged)]
-    enum MaybeEnv<V> {
+    enum MaybeEnv<'a, V> {
         Value(Option<V>),
-        Env { env: String },
+        Env { env: &'a str },
     }
 
     match MaybeEnv::deserialize(deserializer)? {
@@ -234,4 +225,13 @@ where
         }
         .map_err(de::Error::custom),
     }
+}
+
+fn deserialize_humansize<'de, D>(deserializer: D) -> Result<usize, D::Error>
+where
+    D: de::Deserializer<'de>,
+{
+    let value: &str = Deserialize::deserialize(deserializer)?;
+    let size = Size::from_str(value).map_err(de::Error::custom)?;
+    Ok(size.to_bytes() as usize)
 }
