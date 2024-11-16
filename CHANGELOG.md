@@ -25,5 +25,6 @@ The minor version will be incremented upon a breaking change and the patch versi
 - geyser: wait all transactions before process block ([#10](https://github.com/solana-stream-solutions/solfees/pull/10))
 - frontend: init ([#8](https://github.com/solana-stream-solutions/solfees/pull/8))
 - geyser: use process_compute_budget_instructions ([#15](https://github.com/solana-stream-solutions/solfees/pull/15))
+- api: improve parallelism ([#16](https://github.com/solana-stream-solutions/solfees/pull/16))
 
 ### Breaking

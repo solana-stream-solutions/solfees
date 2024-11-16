@@ -17,7 +17,7 @@ async fn main2(config: Config) -> anyhow::Result<()> {
     let (solana_rpc, solana_rpc_futs) = SolanaRpc::new(
         config.listen_rpc.request_calls_max,
         config.listen_rpc.request_timeout,
-        config.listen_rpc.request_queue_max,
+        config.listen_rpc.calls_queue_max,
         config.listen_rpc.streams_channel_capacity,
         config.listen_rpc.pool_size,
     );
