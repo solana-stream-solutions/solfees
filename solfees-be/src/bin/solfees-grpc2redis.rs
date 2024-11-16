@@ -153,35 +153,37 @@ end
                 .context("failed to get finalized slot from Redis")?;
         }
 
-        let mut pipe_size = 0;
-        let mut pipe = redis::pipe();
-        for message in messages.iter() {
-            if message.slot() > redis_finalized_slot.checked_sub(10).unwrap_or_default() {
-                pipe_size += 1;
-                pipe.cmd("XADD")
-                    .arg(&config.redis.stream_key)
-                    .arg("MAXLEN")
-                    .arg("~")
-                    .arg(config.redis.stream_maxlen)
-                    .arg("*")
-                    .arg(&config.redis.stream_field_key)
-                    .arg(bincode::serialize(message).context("failed to serialize GeyserMessage")?)
-                    .ignore();
-            }
+        let messages = messages
+            .into_iter()
+            .filter(|msg| msg.slot() >= redis_finalized_slot)
+            .collect::<Vec<_>>();
+        if messages.is_empty() {
+            continue;
         }
 
-        if pipe_size > 0 {
-            let _: () = pipe
-                .atomic()
-                .query_async(&mut connection)
-                .await
-                .context("failed to send data to Redis stream")?;
+        let mut pipe = redis::pipe();
+        for message in messages.iter() {
+            pipe.cmd("XADD")
+                .arg(&config.redis.stream_key)
+                .arg("MAXLEN")
+                .arg("~")
+                .arg(config.redis.stream_maxlen)
+                .arg("*")
+                .arg(&config.redis.stream_field_key)
+                .arg(bincode::serialize(message).context("failed to serialize GeyserMessage")?)
+                .ignore();
+        }
 
-            metrics::redis_messages_pushed_inc_by(messages.len());
-            for message in messages {
-                if let GeyserMessage::Status { slot, commitment } = message {
-                    metrics::redis_slot_pushed_set(commitment, slot);
-                }
+        let _: () = pipe
+            .atomic()
+            .query_async(&mut connection)
+            .await
+            .context("failed to send data to Redis stream")?;
+
+        metrics::redis_messages_pushed_inc_by(messages.len());
+        for message in messages {
+            if let GeyserMessage::Status { slot, commitment } = message {
+                metrics::redis_slot_pushed_set(commitment, slot);
             }
         }
     }
