@@ -1173,8 +1173,14 @@ impl StreamsSlotInfo {
         let mut fees = Vec::with_capacity(self.transactions.len());
         for transaction in self.transactions.iter().filter(|tx| {
             !tx.vote
-                && SlotSubscribeFilter::filter_pubkeys(&filter.read_write, &tx.accounts.writable)
-                && SlotSubscribeFilter::filter_pubkeys(&filter.read_only, &tx.accounts.readable)
+                && filter
+                    .read_write
+                    .iter()
+                    .all(|pubkey| tx.accounts.writable.contains(pubkey))
+                && filter
+                    .read_only
+                    .iter()
+                    .all(|pubkey| tx.accounts.readable.contains(pubkey))
         }) {
             fees.push(transaction.unit_price);
         }
@@ -1356,15 +1362,6 @@ impl TryFrom<ReqParamsSlotsSubscribeConfig> for SlotSubscribeFilter {
             read_only,
             levels: config.levels,
         })
-    }
-}
-
-impl SlotSubscribeFilter {
-    fn filter_pubkeys(required: &[Pubkey], pubkeys: &[Pubkey]) -> bool {
-        required.is_empty()
-            || required
-                .iter()
-                .all(|pubkey| pubkeys.binary_search(pubkey).is_ok())
     }
 }
 

@@ -95,9 +95,9 @@ impl CommitmentLevel {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct GeyserTransactionAccounts {
-    pub writable: Vec<Pubkey>,
-    pub readable: Vec<Pubkey>,
-    pub signers: Vec<Pubkey>,
+    pub writable: HashSet<Pubkey>,
+    pub readable: HashSet<Pubkey>,
+    pub signers: HashSet<Pubkey>,
     pub fee_payer: Pubkey,
 }
 
@@ -109,7 +109,7 @@ impl From<(VersionedMessage, TransactionStatusMeta)> for GeyserTransactionAccoun
         // See details in `solana_program`:
         // https://docs.rs/solana-program/2.0.8/src/solana_program/message/compiled_keys.rs.html#103-113
 
-        let mut writable = meta
+        let writable = meta
             .loaded_addresses
             .writable
             .into_iter()
@@ -126,12 +126,9 @@ impl From<(VersionedMessage, TransactionStatusMeta)> for GeyserTransactionAccoun
                     .iter()
                     .copied(),
             )
-            .collect::<HashSet<_>>()
-            .into_iter()
-            .collect::<Vec<_>>();
-        writable.sort_unstable();
+            .collect::<HashSet<_>>();
 
-        let mut readable = meta
+        let readable = meta
             .loaded_addresses
             .readonly
             .into_iter()
@@ -150,18 +147,12 @@ impl From<(VersionedMessage, TransactionStatusMeta)> for GeyserTransactionAccoun
                     .iter()
                     .copied(),
             )
-            .collect::<HashSet<_>>()
-            .into_iter()
-            .collect::<Vec<_>>();
-        readable.sort_unstable();
+            .collect::<HashSet<_>>();
 
-        let mut signers = static_account_keys[0..header.num_required_signatures as usize]
+        let signers = static_account_keys[0..header.num_required_signatures as usize]
             .iter()
             .copied()
-            .collect::<HashSet<_>>()
-            .into_iter()
-            .collect::<Vec<_>>();
-        signers.sort_unstable();
+            .collect::<HashSet<_>>();
 
         Self {
             writable,
