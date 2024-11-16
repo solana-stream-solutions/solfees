@@ -140,7 +140,7 @@ impl SolanaRpc {
         streams_channel_capacity: usize,
         pool_size: usize,
     ) -> (Self, Vec<BoxFuture<'static, anyhow::Result<()>>>) {
-        const REDIS_CHANNEL_SIZE: usize = 1_024;
+        const REDIS_CHANNEL_SIZE: usize = 2_048;
 
         let (redis_tx, _redis_rx) = broadcast::channel(REDIS_CHANNEL_SIZE);
         let (streams_tx, _streams_rx) = broadcast::channel(streams_channel_capacity);
