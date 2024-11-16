@@ -168,7 +168,7 @@ impl Default for ConfigListenRpc {
     fn default() -> Self {
         Self {
             bind: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8000),
-            body_limit: 16 * 1024, // 16 KiB
+            body_limit: 16 * 1024, // 16KiB
             request_calls_max: 5,
             request_timeout: Duration::from_secs(60),
             request_queue_max: 5_000,

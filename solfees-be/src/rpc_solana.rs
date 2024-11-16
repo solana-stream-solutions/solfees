@@ -337,7 +337,7 @@ impl SolanaRpc {
                                         id: call.id.clone(),
                                         slot: None,
                                         epoch: Some(epoch),
-                                        commitment: CommitmentLevel::default(),
+                                        commitment: CommitmentLevel::Finalized,
                                         identity: None,
                                     }
                                 },
