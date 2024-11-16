@@ -81,6 +81,7 @@ impl Default for ConfigGrpc {
 #[serde(deny_unknown_fields, default)]
 pub struct ConfigRedisPublisher {
     pub endpoint: String,
+    pub slot_finalized: String,
     pub stream_key: String,
     pub stream_maxlen: u64,
     pub stream_field_key: String,
@@ -91,6 +92,7 @@ impl Default for ConfigRedisPublisher {
     fn default() -> Self {
         Self {
             endpoint: "redis://127.0.0.1:6379/".to_owned(),
+            slot_finalized: "solfees:finalized".to_owned(),
             stream_key: "solfees:events".to_owned(),
             stream_maxlen: 15 * 60 * 3 * 4, // ~15min (2.5 slots per sec, 4 events per slot)
             stream_field_key: "message".to_owned(),
