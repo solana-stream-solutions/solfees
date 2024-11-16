@@ -267,6 +267,13 @@ pub enum GeyserMessage {
 }
 
 impl GeyserMessage {
+    pub const fn slot(&self) -> Slot {
+        *match self {
+            Self::Status { slot, .. } => slot,
+            Self::Slot { slot, .. } => slot,
+        }
+    }
+
     fn build_block(leader: Option<Pubkey>, block_info: BlockInfo) -> anyhow::Result<GeyserMessage> {
         let Some(meta) = block_info.meta else {
             anyhow::bail!("failed to get block meta");

@@ -6,7 +6,7 @@ use {
     solfees_be::{
         cli,
         config::ConfigGrpc2Redis as Config,
-        grpc_geyser::{self, GeyserMessage},
+        grpc_geyser::{self, CommitmentLevel, GeyserMessage},
         metrics::grpc2redis as metrics,
         rpc_server,
         schedule::LeaderScheduleRpc,
@@ -67,9 +67,8 @@ async fn main2(config: Config) -> anyhow::Result<()> {
     let sigint = SignalKind::interrupt();
     let sigterm = SignalKind::terminate();
 
+    let mut redis_finalized_slot = 0u64;
     loop {
-        let mut pipe = redis::pipe();
-
         let mut messages = tokio::select! {
             signal = shutdown_rx.recv() => {
                 match signal {
@@ -98,7 +97,7 @@ async fn main2(config: Config) -> anyhow::Result<()> {
                     break;
                 };
 
-                let _: () = pipe.cmd("HSET")
+                let _: () = redis::pipe().cmd("HSET")
                     .arg(&config.redis.epochs_key)
                     .arg(epoch)
                     .arg(bincode::serialize(&schedule).context("failed to serialize leader schedule")?)
@@ -117,28 +116,72 @@ async fn main2(config: Config) -> anyhow::Result<()> {
             messages.push(maybe_message?);
         }
 
-        for message in messages.iter() {
-            pipe.cmd("XADD")
-                .arg(&config.redis.stream_key)
-                .arg("MAXLEN")
-                .arg("~")
-                .arg(config.redis.stream_maxlen)
-                .arg("*")
-                .arg(&config.redis.stream_field_key)
-                .arg(bincode::serialize(message).context("failed to serialize GeyserMessage")?)
-                .ignore();
+        if let Some(finalized_slot) = messages
+            .iter()
+            .filter_map(|message| {
+                if let GeyserMessage::Status {
+                    slot,
+                    commitment: CommitmentLevel::Finalized,
+                } = message
+                {
+                    Some(slot)
+                } else {
+                    None
+                }
+            })
+            .max()
+        {
+            redis_finalized_slot = redis::cmd("EVAL")
+                .arg(
+                    r#"
+-- redis.log(redis.LOG_WARNING, "hi");
+local new = tonumber(ARGV[1])
+local current = tonumber(redis.call("GET", KEYS[1]));
+if current == nil or current < new then
+    redis.call("SET", KEYS[1], ARGV[1]);
+    return new;
+else
+    return current;
+end
+"#,
+                )
+                .arg(1)
+                .arg(&config.redis.slot_finalized)
+                .arg(finalized_slot)
+                .query_async(&mut connection)
+                .await
+                .context("failed to get finalized slot from Redis")?;
         }
 
-        let _: () = pipe
-            .atomic()
-            .query_async(&mut connection)
-            .await
-            .context("failed to send data to Redis stream")?;
+        let mut pipe_size = 0;
+        let mut pipe = redis::pipe();
+        for message in messages.iter() {
+            if message.slot() > redis_finalized_slot.checked_sub(10).unwrap_or_default() {
+                pipe_size += 1;
+                pipe.cmd("XADD")
+                    .arg(&config.redis.stream_key)
+                    .arg("MAXLEN")
+                    .arg("~")
+                    .arg(config.redis.stream_maxlen)
+                    .arg("*")
+                    .arg(&config.redis.stream_field_key)
+                    .arg(bincode::serialize(message).context("failed to serialize GeyserMessage")?)
+                    .ignore();
+            }
+        }
 
-        metrics::redis_messages_pushed_inc_by(messages.len());
-        for message in messages {
-            if let GeyserMessage::Status { slot, commitment } = message {
-                metrics::redis_slot_pushed_set(commitment, slot);
+        if pipe_size > 0 {
+            let _: () = pipe
+                .atomic()
+                .query_async(&mut connection)
+                .await
+                .context("failed to send data to Redis stream")?;
+
+            metrics::redis_messages_pushed_inc_by(messages.len());
+            for message in messages {
+                if let GeyserMessage::Status { slot, commitment } = message {
+                    metrics::redis_slot_pushed_set(commitment, slot);
+                }
             }
         }
     }
