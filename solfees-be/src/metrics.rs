@@ -268,7 +268,7 @@ pub mod solfees_be {
             })
         }
 
-        pub fn start_timer(&self) -> ClientIdTimer {
+        pub fn start_timer_cpu(&self) -> ClientIdTimerCpu {
             ClientIdTimer::new(self)
         }
 
@@ -286,13 +286,13 @@ pub mod solfees_be {
     }
 
     #[derive(Debug)]
-    pub struct ClientIdTimer<'a> {
+    pub struct ClientIdTimerCpu<'a> {
         client_id: &'a ClientId,
         start: Instant,
         observed: bool,
     }
 
-    impl<'a> Drop for ClientIdTimer<'a> {
+    impl<'a> Drop for ClientIdTimerCpu<'a> {
         fn drop(&mut self) {
             if !self.observed {
                 self.observe(true);
@@ -300,7 +300,7 @@ pub mod solfees_be {
         }
     }
 
-    impl<'a> ClientIdTimer<'a> {
+    impl<'a> ClientIdTimerCpu<'a> {
         fn new(client_id: &'a ClientId) -> Self {
             Self {
                 client_id,

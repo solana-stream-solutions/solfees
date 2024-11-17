@@ -194,7 +194,7 @@ impl SolanaRpc {
         body: impl Buf,
         mut shutdown_rx: broadcast::Receiver<()>,
     ) -> anyhow::Result<(RpcRequestsStats, Vec<u8>)> {
-        let timer = client_id.start_timer();
+        let timer = client_id.start_timer_cpu();
         let mut stats = RpcRequestsStats::default();
 
         #[derive(Debug, Deserialize)]
@@ -561,7 +561,7 @@ impl SolanaRpc {
         }
 
         anyhow::ensure!(calls_total == outputs.len(), "invalid number of outputs");
-        let _timer = client_id.start_timer();
+        let _timer = client_id.start_timer_cpu(); // report when dropped
         match outputs
             .into_iter()
             .map(|output| output.ok_or(()))
@@ -661,7 +661,7 @@ impl SolanaRpc {
                         break Some(Some("received invalid message"));
                     };
 
-                    let timer = client_id.start_timer();
+                    let timer = client_id.start_timer_cpu();
                     match call.method.as_str() {
                         "SlotsSubscribe" => {
                             let output = match call.params.parse().and_then(|config: ReqParamsSlotsSubscribeConfig| {
@@ -682,7 +682,7 @@ impl SolanaRpc {
 
                 maybe_update = updates_rx.recv() => match maybe_update {
                     Ok(update) => if let Some((id, filter)) = filter.as_ref() {
-                        let timer = client_id.start_timer();
+                        let timer = client_id.start_timer_cpu();
                         let output = match update.as_ref() {
                             StreamsUpdateMessage::Status { slot, commitment } => {
                                 SlotsSubscribeOutput::Status {
@@ -865,7 +865,7 @@ impl SolanaRpc {
                     Some(task) => {
                         metrics::requests_queue_size_dec();
                         if !task.shutdown.load(Ordering::Relaxed) {
-                            let timer = task.client_id.start_timer();
+                            let timer = task.client_id.start_timer_cpu();
                             let _ = task.tx.send(Self::handle_request_task(
                                 task.request,
                                 &latest_blockhash_storage,
