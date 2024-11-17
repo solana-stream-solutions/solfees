@@ -33,7 +33,7 @@ use {
     },
     std::{
         borrow::Cow,
-        collections::{BTreeMap, HashMap},
+        collections::{BTreeMap, BTreeSet, HashMap},
         sync::{
             atomic::{AtomicBool, Ordering},
             Arc,
@@ -832,11 +832,11 @@ impl SolanaRpc {
                             hash,
                             time,
                             height,
-                            parent_slot: _parent_slot,
+                            parent_slot,
                             parent_hash: _parent_hash,
                             transactions,
                         } => {
-                            latest_blockhash_storage.push_block(slot, height, hash);
+                            latest_blockhash_storage.push_block(slot, parent_slot, height, hash);
 
                             let info = StreamsSlotInfo::new(leader, slot, hash, time, height, transactions);
                             slots_info.insert(slot, info.clone());
@@ -1154,54 +1154,130 @@ enum RpcRequest {
 
 #[derive(Debug, Default)]
 struct LatestBlockhashStorage {
-    slots: BTreeMap<Slot, LatestBlockhashSlot>,
-    finalized_total: usize,
     slot_processed: Slot,
     slot_confirmed: Slot,
     slot_finalized: Slot,
+    confirmed: BTreeSet<Slot>,
+    finalized: BTreeSet<Slot>,
+    slots: BTreeMap<Slot, LatestBlockhashSlot>,
 }
 
 impl LatestBlockhashStorage {
-    fn push_block(&mut self, slot: Slot, height: Slot, hash: Hash) {
-        self.slots.insert(
-            slot,
-            LatestBlockhashSlot {
-                hash,
-                height,
-                commitment: CommitmentLevel::Processed,
-            },
-        );
-    }
-
-    fn update_commitment(&mut self, slot: Slot, commitment: CommitmentLevel) {
-        if let Some(value) = self.slots.get_mut(&slot) {
-            value.commitment = commitment;
-
-            if commitment == CommitmentLevel::Processed && slot > self.slot_processed {
-                self.slot_processed = slot;
-            } else if commitment == CommitmentLevel::Confirmed {
-                self.slot_confirmed = slot;
-            } else if commitment == CommitmentLevel::Finalized {
-                self.finalized_total += 1;
-                self.slot_finalized = slot;
-            }
-        }
-
-        while self.finalized_total > MAX_PROCESSING_AGE + 10 {
-            if let Some((_slot, value)) = self.slots.pop_first() {
-                if value.commitment == CommitmentLevel::Finalized {
-                    self.finalized_total -= 1;
+    fn update_slots(&mut self) {
+        for (slot, entry) in self.slots.iter().rev() {
+            match entry.commitment {
+                CommitmentLevel::Processed => {
+                    self.slot_processed = self.slot_processed.max(*slot);
+                }
+                CommitmentLevel::Confirmed => {
+                    self.slot_confirmed = self.slot_confirmed.max(*slot);
+                }
+                CommitmentLevel::Finalized => {
+                    self.slot_finalized = self.slot_finalized.max(*slot);
+                    break;
                 }
             }
         }
+
+        // in case of epoch change with a lot of forks we can receive confirmed directly
+        self.slot_processed = self.slot_processed.max(self.slot_confirmed);
+    }
+
+    fn push_block(&mut self, slot: Slot, parent: Slot, height: Slot, hash: Hash) {
+        // in case if slot status was received before block
+        let mut commitment = CommitmentLevel::Processed;
+        if self.confirmed.contains(&slot) {
+            commitment = CommitmentLevel::Confirmed;
+        }
+        if self.finalized.contains(&slot) {
+            commitment = CommitmentLevel::Finalized;
+        }
+        self.slots.insert(
+            slot,
+            LatestBlockhashSlot {
+                commitment,
+                parent,
+                height,
+                hash,
+            },
+        );
+
+        // keep slots under the limit
+        let slots_to_remove = self
+            .slots
+            .values()
+            .filter_map(|entry| (entry.commitment == CommitmentLevel::Finalized).then_some(1))
+            .sum::<usize>()
+            .checked_sub(MAX_PROCESSING_AGE + 10)
+            .unwrap_or_default();
+        for _ in 0..slots_to_remove {
+            while let Some((_slot, value)) = self.slots.pop_first() {
+                if value.commitment == CommitmentLevel::Finalized {
+                    break;
+                }
+            }
+        }
+
+        // update tips
+        self.update_slots();
+    }
+
+    fn update_commitment(&mut self, slot: Slot, commitment: CommitmentLevel) {
+        // save commitment
+        if commitment == CommitmentLevel::Confirmed {
+            self.confirmed.insert(slot);
+        } else if commitment == CommitmentLevel::Finalized {
+            self.confirmed.insert(slot);
+            self.finalized.insert(slot);
+        }
+        while self.confirmed.len() > MAX_PROCESSING_AGE {
+            self.confirmed.pop_first();
+        }
+        while self.finalized.len() > MAX_PROCESSING_AGE {
+            self.finalized.pop_first();
+        }
+
+        // update current and all slots before
+        if let Some(value) = self.slots.get_mut(&slot) {
+            value.commitment = value.commitment.max(commitment);
+
+            let mut parent_slot = value.parent;
+            if commitment == CommitmentLevel::Confirmed {
+                loop {
+                    if let Some(value) = self.slots.get_mut(&parent_slot) {
+                        if value.commitment == CommitmentLevel::Processed {
+                            value.commitment = CommitmentLevel::Confirmed;
+                            parent_slot = value.parent;
+                            continue;
+                        }
+                    }
+                    break;
+                }
+            } else if commitment == CommitmentLevel::Finalized {
+                loop {
+                    if let Some(value) = self.slots.get_mut(&parent_slot) {
+                        if value.commitment != CommitmentLevel::Finalized {
+                            value.commitment = CommitmentLevel::Finalized;
+                            parent_slot = value.parent;
+                            continue;
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+
+        // update tips
+        self.update_slots();
     }
 }
 
 #[derive(Debug)]
 struct LatestBlockhashSlot {
-    hash: Hash,
-    height: Slot,
     commitment: CommitmentLevel,
+    parent: Slot,
+    height: Slot,
+    hash: Hash,
 }
 
 #[derive(Debug, Clone)]
