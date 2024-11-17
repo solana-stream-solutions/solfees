@@ -608,11 +608,12 @@ impl SolanaRpc {
 
         let mut updates_rx = self.streams_tx.subscribe();
         let mut filter = None;
-        let mut websocket_tx_message = None;
+        let mut websocket_tx_message: Option<WebSocketMessage> = None;
         let mut flush_required = false;
 
         let loop_close_reason = loop {
             if let Some(message) = websocket_tx_message.take() {
+                client_id.observe_egress_ws(message.len() as u64);
                 if websocket_tx.feed(message).await.is_err() {
                     break None;
                 }
@@ -807,7 +808,7 @@ impl SolanaRpc {
     }
 
     async fn run_request_update_loop(
-        index: usize,
+        loop_index: usize,
         mut redis_rx: broadcast::Receiver<RedisMessage>,
         requests_rx: Arc<Mutex<mpsc::Receiver<RpcRequestTask>>>,
     ) -> anyhow::Result<()> {
@@ -851,13 +852,13 @@ impl SolanaRpc {
                         }
                     }
                     Ok(RedisMessage::Epoch { epoch, leader_schedule_solfees, leader_schedule_rpc }) => {
-                        info!(index, epoch, "epoch received");
+                        info!(loop_index, epoch, "epoch received");
                         leader_schedule_map_solfees.insert(epoch, leader_schedule_solfees);
                         leader_schedule_map_rpc.insert(epoch, leader_schedule_rpc);
                         continue;
                     }
                     Err(broadcast::error::RecvError::Closed) => break,
-                    Err(broadcast::error::RecvError::Lagged(_lag)) => anyhow::bail!("run_request_update_loop#{index} lagged"),
+                    Err(broadcast::error::RecvError::Lagged(_lag)) => anyhow::bail!("run_request_update_loop#{loop_index} lagged"),
                 },
 
                 maybe_rpc_requests_task = Self::get_next_requests(&requests_rx) => match maybe_rpc_requests_task {

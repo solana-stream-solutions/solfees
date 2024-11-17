@@ -146,6 +146,11 @@ pub mod solfees_be {
             Opts::new("client_usage_cpu_total", "Total number of CPU usage in nanoseconds"),
             &["client_id", "subscription_id"]
         ).unwrap();
+
+        static ref CLIENT_USAGE_EGRESS_WS_TOTAL: IntCounterVec = IntCounterVec::new(
+            Opts::new("client_usage_egress_total", "Total number of bytes sent over WebSocket"),
+            &["client_id", "subscription_id"]
+        ).unwrap();
     }
 
     pub fn init() {
@@ -157,6 +162,7 @@ pub mod solfees_be {
         register!(REQUESTS_QUEUE_SIZE);
         register!(WEBSOCKETS_ALIVE_TOTAL);
         register!(CLIENT_USAGE_CPU_TOTAL);
+        register!(CLIENT_USAGE_EGRESS_WS_TOTAL);
     }
 
     pub fn set_slot(commitment: CommitmentLevel, slot: Slot) {
@@ -260,10 +266,16 @@ pub mod solfees_be {
             ClientIdTimer::new(self)
         }
 
-        fn observe(&self, nanos: u64) {
+        pub fn observe_cpu(&self, nanos: u64) {
             CLIENT_USAGE_CPU_TOTAL
                 .with_label_values(&[&self.inner.client_id, &self.inner.subsription_id])
                 .inc_by(nanos);
+        }
+
+        pub fn observe_egress_ws(&self, bytes: u64) {
+            CLIENT_USAGE_EGRESS_WS_TOTAL
+                .with_label_values(&[&self.inner.client_id, &self.inner.subsription_id])
+                .inc_by(bytes);
         }
     }
 
@@ -296,7 +308,7 @@ pub mod solfees_be {
             if record {
                 let elapsed = Instant::now().saturating_duration_since(self.start);
                 let nanos = elapsed.as_secs() * 1_000_000_000 + elapsed.subsec_nanos() as u64;
-                self.client_id.observe(nanos);
+                self.client_id.observe_cpu(nanos);
             }
         }
 
