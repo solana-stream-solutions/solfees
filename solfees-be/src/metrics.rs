@@ -269,7 +269,7 @@ pub mod solfees_be {
         }
 
         pub fn start_timer_cpu(&self) -> ClientIdTimerCpu {
-            ClientIdTimer::new(self)
+            ClientIdTimerCpu::new(self)
         }
 
         pub fn observe_cpu(&self, nanos: u64) {
