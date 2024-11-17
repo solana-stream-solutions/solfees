@@ -17,7 +17,7 @@ listen_rpc:
   request_timeout: 60s # Request timeout (processed by dedicated tasks, see `pool_size`)
   calls_queue_max: 16384 # Maximum number of requests in the queue (each request can contain max `request_calls_max` calls)
   streams_channel_capacity: 512 # Maximum number of messages in WebSocket channel before disconnect
-  pool_size: 1 # Number of workers processing requests (WebSocket streams processed by separate task)
+  pool_size: 2 # Number of workers processing requests (WebSocket streams processed by separate task)
 
 metrics:
   # `null` means empty label will be used (default value)
