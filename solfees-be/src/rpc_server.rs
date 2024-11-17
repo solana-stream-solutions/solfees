@@ -18,11 +18,8 @@ use {
         server::{conn::auto::Builder as ServerBuilder, graceful::GracefulShutdown},
     },
     std::{net::SocketAddr, sync::Arc, time::Instant},
-    tokio::{
-        net::TcpListener,
-        sync::{broadcast, Notify},
-    },
-    tracing::{error, info},
+    tokio::{net::TcpListener, sync::Notify},
+    tracing::{debug, error, info},
 };
 
 pub async fn run_admin(addr: SocketAddr, shutdown: Arc<Notify>) -> anyhow::Result<()> {
@@ -83,13 +80,11 @@ pub async fn run_solfees(
 
         let solana_rpc = solana_rpc.clone();
         let config_metrics = Arc::clone(&config_metrics);
-        let (shutdown_tx, shutdown_rx) = broadcast::channel(1);
         let connection = http.serve_connection_with_upgrades(
             TokioIo::new(Box::pin(stream)),
             service_fn(move |mut req: Request<BodyIncoming>| {
                 let solana_rpc = solana_rpc.clone();
                 let config_metrics = Arc::clone(&config_metrics);
-                let shutdown_rx = shutdown_rx.resubscribe();
                 async move {
                     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
                     enum ReqType {
@@ -129,7 +124,6 @@ pub async fn run_solfees(
                                         client_id,
                                         solana_rpc_mode,
                                         body.aggregate(),
-                                        shutdown_rx,
                                     )
                                 })
                                 .await
@@ -179,11 +173,11 @@ pub async fn run_solfees(
                 }
             }),
         );
-        let fut = graceful.watch(connection.into_owned());
-
+        let connection = graceful.watch(connection.into_owned());
         tokio::spawn(async move {
-            let _ = fut.await;
-            drop(shutdown_tx);
+            if let Err(error) = connection.await {
+                debug!(error, "connection error");
+            }
         });
     }
 

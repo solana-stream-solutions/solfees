@@ -192,7 +192,6 @@ impl SolanaRpc {
         client_id: ClientId,
         mode: SolanaRpcMode,
         body: impl Buf,
-        mut shutdown_rx: broadcast::Receiver<()>,
     ) -> anyhow::Result<(RpcRequestsStats, Vec<u8>)> {
         let timer = client_id.start_timer_cpu();
         let mut stats = RpcRequestsStats::default();
@@ -534,14 +533,6 @@ impl SolanaRpc {
             let response_rx = join_all(rxs);
 
             tokio::select! {
-                value = shutdown_rx.recv() => match value {
-                    Ok(()) => unreachable!(),
-                    Err(broadcast::error::RecvError::Closed) => {
-                        shutdown.store(true, Ordering::Relaxed);
-                        anyhow::bail!("connection closed");
-                    },
-                    Err(broadcast::error::RecvError::Lagged(_)) => unreachable!(),
-                },
                 () = sleep(self.request_timeout) => {
                     shutdown.store(true, Ordering::Relaxed);
                     anyhow::bail!("request timeout");
