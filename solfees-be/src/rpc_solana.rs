@@ -581,6 +581,7 @@ impl SolanaRpc {
         client_id: ClientId,
         mode: SolanaRpcMode,
         websocket: HyperWebsocket,
+        mut shutdown_rx: broadcast::Receiver<()>,
     ) {
         let ws_frontend = match mode {
             SolanaRpcMode::Solfees => false,
@@ -618,6 +619,8 @@ impl SolanaRpc {
             };
 
             tokio::select! {
+                _ = shutdown_rx.recv() => break Some(None),
+
                 flush_result = websocket_tx_flush => match flush_result {
                     Ok(()) => {
                         flush_required = false;

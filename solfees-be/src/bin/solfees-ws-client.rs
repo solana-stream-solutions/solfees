@@ -68,12 +68,14 @@ async fn main() -> anyhow::Result<()> {
                 Some(Ok(Message::Ping(_))) => continue,
                 Some(Ok(Message::Pong(_))) => continue,
                 Some(Ok(Message::Frame(_))) => continue,
-                Some(Ok(Message::Close(_))) => return Ok(()),
+                Some(Ok(Message::Close(_))) => anyhow::bail!("close message received"),
                 Some(Err(error)) => anyhow::bail!(error),
-                None => anyhow::bail!("stream is closed"),
+                None => anyhow::bail!("stream finished"),
             };
             info!("new message: {text}");
         }
+        #[allow(unreachable_code)]
+        Ok::<(), anyhow::Error>(())
     };
 
     tokio::try_join!(req_to_ws, ws_to_stdout).map(|_| ())
