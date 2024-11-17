@@ -16,7 +16,7 @@ The minor version will be incremented upon a breaking change and the patch versi
 
 ### Breaking
 
-## [2.0.0] - 2024-11-17
+## [2.0.0] - 2024-11-18
 
 - api: add getLeaderSchedule ([#1](https://github.com/solana-stream-solutions/solfees/pull/1))
 - rpc: run multiple handlers ([#2](https://github.com/solana-stream-solutions/solfees/pull/2))

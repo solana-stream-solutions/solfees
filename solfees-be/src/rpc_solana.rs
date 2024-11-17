@@ -923,37 +923,17 @@ impl SolanaRpc {
                         SolanaRpc::internal_error_with_data("no slot"),
                     );
                 };
-                if rollback > 0 {
-                    let Some(first_available_slot) =
-                        latest_blockhash_storage.slots.keys().next().copied()
+                for _ in 0..rollback {
+                    let Some(parent_value) = latest_blockhash_storage.slots.get(&value.parent)
                     else {
                         return Self::create_failure(
                             jsonrpc,
                             id,
-                            JsonrpcError::invalid_params("empty slots storage"),
+                            JsonrpcError::invalid_params("not enought slots in the storage"),
                         );
                     };
-
-                    for _ in 0..rollback {
-                        loop {
-                            slot -= 1;
-
-                            if let Some(prev_value) = latest_blockhash_storage.slots.get(&slot) {
-                                if prev_value.height + 1 == value.height {
-                                    value = prev_value;
-                                    break;
-                                }
-                            } else if slot < first_available_slot {
-                                return Self::create_failure(
-                                    jsonrpc,
-                                    id,
-                                    JsonrpcError::invalid_params(
-                                        "not enought slots in the storage",
-                                    ),
-                                );
-                            }
-                        }
-                    }
+                    slot = value.parent;
+                    value = parent_value;
                 }
 
                 Self::create_success2(
