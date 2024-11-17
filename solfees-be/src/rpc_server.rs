@@ -1,5 +1,6 @@
 use {
     crate::{
+        config::ConfigMetrics,
         metrics::{self, solfees_be as metrics_be},
         rpc_solana::{SolanaRpc, SolanaRpcMode},
     },
@@ -66,6 +67,7 @@ pub async fn run_solfees(
     addr: SocketAddr,
     body_limit: usize,
     solana_rpc: SolanaRpc,
+    config_metrics: Arc<ConfigMetrics>,
     shutdown: Arc<Notify>,
 ) -> anyhow::Result<()> {
     let listener = TcpListener::bind(addr).await?;
@@ -80,11 +82,13 @@ pub async fn run_solfees(
         };
 
         let solana_rpc = solana_rpc.clone();
+        let config_metrics = Arc::clone(&config_metrics);
         let (shutdown_tx, shutdown_rx) = broadcast::channel(1);
         let connection = http.serve_connection_with_upgrades(
             TokioIo::new(Box::pin(stream)),
             service_fn(move |mut req: Request<BodyIncoming>| {
                 let solana_rpc = solana_rpc.clone();
+                let config_metrics = Arc::clone(&config_metrics);
                 let shutdown_rx = shutdown_rx.resubscribe();
                 async move {
                     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -113,6 +117,7 @@ pub async fn run_solfees(
                         }
                     };
 
+                    let client_id = metrics_be::ClientId::new(req.headers(), &config_metrics);
                     match req_type {
                         ReqType::Rpc => {
                             let ts = Instant::now();
@@ -121,6 +126,7 @@ pub async fn run_solfees(
                                 .map_err(|error| anyhow::anyhow!(error))
                                 .and_then(|body| {
                                     solana_rpc.on_request(
+                                        client_id,
                                         solana_rpc_mode,
                                         body.aggregate(),
                                         shutdown_rx,
@@ -156,9 +162,11 @@ pub async fn run_solfees(
                                 }),
                             ) {
                                 Ok((response, websocket)) => {
-                                    tokio::spawn(
-                                        solana_rpc.on_websocket(solana_rpc_mode, websocket),
-                                    );
+                                    tokio::spawn(solana_rpc.on_websocket(
+                                        client_id,
+                                        solana_rpc_mode,
+                                        websocket,
+                                    ));
                                     let (parts, body) = response.into_parts();
                                     Ok(Response::from_parts(parts, body.boxed()))
                                 }

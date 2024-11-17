@@ -118,14 +118,15 @@ impl Default for ConfigListenAdmin {
 
 #[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields, default)]
-pub struct ConfigSolfees {
+pub struct ConfigBe {
     pub tracing: ConfigTracing,
     pub redis: ConfigRedisConsumer,
     pub listen_admin: ConfigListenAdmin,
     pub listen_rpc: ConfigListenRpc,
+    pub metrics: ConfigMetrics,
 }
 
-impl WithConfigTracing for ConfigSolfees {
+impl WithConfigTracing for ConfigBe {
     fn get_tracing(&self) -> &ConfigTracing {
         &self.tracing
     }
@@ -178,6 +179,13 @@ impl Default for ConfigListenRpc {
             pool_size: 2,
         }
     }
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct ConfigMetrics {
+    pub usage_client_id: Option<String>,
+    pub usage_subscription_id: Option<String>,
 }
 
 fn deserialize_maybe_env<'de, T, D>(deserializer: D) -> Result<T, D::Error>

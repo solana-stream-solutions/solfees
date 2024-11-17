@@ -1,7 +1,7 @@
 use {
     crate::{
         grpc_geyser::{CommitmentLevel, GeyserMessage, GeyserTransaction},
-        metrics::solfees_be as metrics,
+        metrics::solfees_be::{self as metrics, ClientId},
         redis::RedisMessage,
     },
     futures::{
@@ -189,10 +189,12 @@ impl SolanaRpc {
 
     pub async fn on_request(
         &self,
+        client_id: ClientId,
         mode: SolanaRpcMode,
         body: impl Buf,
         mut shutdown_rx: broadcast::Receiver<()>,
     ) -> anyhow::Result<(RpcRequestsStats, Vec<u8>)> {
+        let timer = client_id.start_timer_cpu();
         let mut stats = RpcRequestsStats::default();
 
         #[derive(Debug, Deserialize)]
@@ -503,6 +505,7 @@ impl SolanaRpc {
                 }
             }
         }
+        timer.stop_and_record();
 
         if !requests.is_empty() {
             let shutdown = Arc::new(AtomicBool::new(false));
@@ -511,6 +514,7 @@ impl SolanaRpc {
             for request in requests {
                 let (tx, rx) = oneshot::channel();
                 match self.requests_tx.try_send(RpcRequestTask {
+                    client_id: client_id.clone(),
                     request,
                     shutdown: Arc::clone(&shutdown),
                     tx,
@@ -557,6 +561,7 @@ impl SolanaRpc {
         }
 
         anyhow::ensure!(calls_total == outputs.len(), "invalid number of outputs");
+        let _timer = client_id.start_timer_cpu(); // report when dropped
         match outputs
             .into_iter()
             .map(|output| output.ok_or(()))
@@ -580,7 +585,12 @@ impl SolanaRpc {
         })
     }
 
-    pub async fn on_websocket(self, mode: SolanaRpcMode, websocket: HyperWebsocket) {
+    pub async fn on_websocket(
+        self,
+        client_id: ClientId,
+        mode: SolanaRpcMode,
+        websocket: HyperWebsocket,
+    ) {
         let ws_frontend = match mode {
             SolanaRpcMode::Solfees => false,
             SolanaRpcMode::SolfeesFrontend => true,
@@ -598,11 +608,12 @@ impl SolanaRpc {
 
         let mut updates_rx = self.streams_tx.subscribe();
         let mut filter = None;
-        let mut websocket_tx_message = None;
+        let mut websocket_tx_message: Option<WebSocketMessage> = None;
         let mut flush_required = false;
 
         let loop_close_reason = loop {
             if let Some(message) = websocket_tx_message.take() {
+                client_id.observe_egress_ws(message.len() as u64);
                 if websocket_tx.feed(message).await.is_err() {
                     break None;
                 }
@@ -650,6 +661,7 @@ impl SolanaRpc {
                         break Some(Some("received invalid message"));
                     };
 
+                    let timer = client_id.start_timer_cpu();
                     match call.method.as_str() {
                         "SlotsSubscribe" => {
                             let output = match call.params.parse().and_then(|config: ReqParamsSlotsSubscribeConfig| {
@@ -665,10 +677,12 @@ impl SolanaRpc {
                         },
                         _ => break Some(Some("unknown subscription method")),
                     }
+                    timer.stop_and_record();
                 },
 
                 maybe_update = updates_rx.recv() => match maybe_update {
                     Ok(update) => if let Some((id, filter)) = filter.as_ref() {
+                        let timer = client_id.start_timer_cpu();
                         let output = match update.as_ref() {
                             StreamsUpdateMessage::Status { slot, commitment } => {
                                 SlotsSubscribeOutput::Status {
@@ -684,6 +698,7 @@ impl SolanaRpc {
                             Self::create_success2(None, id.clone(), SlotsSubscribeOutputSolana::from(output))
                         };
                         websocket_tx_message = Some(WebSocketMessage::Text(serde_json::to_string(&message).expect("failed to serialize")));
+                        timer.stop_and_record();
                     }
                     Err(broadcast::error::RecvError::Closed) => break Some(None),
                     Err(broadcast::error::RecvError::Lagged(_)) => break Some(Some("subscription lagged")),
@@ -793,7 +808,7 @@ impl SolanaRpc {
     }
 
     async fn run_request_update_loop(
-        index: usize,
+        loop_index: usize,
         mut redis_rx: broadcast::Receiver<RedisMessage>,
         requests_rx: Arc<Mutex<mpsc::Receiver<RpcRequestTask>>>,
     ) -> anyhow::Result<()> {
@@ -837,19 +852,20 @@ impl SolanaRpc {
                         }
                     }
                     Ok(RedisMessage::Epoch { epoch, leader_schedule_solfees, leader_schedule_rpc }) => {
-                        info!(index, epoch, "epoch received");
+                        info!(loop_index, epoch, "epoch received");
                         leader_schedule_map_solfees.insert(epoch, leader_schedule_solfees);
                         leader_schedule_map_rpc.insert(epoch, leader_schedule_rpc);
                         continue;
                     }
                     Err(broadcast::error::RecvError::Closed) => break,
-                    Err(broadcast::error::RecvError::Lagged(_lag)) => anyhow::bail!("run_request_update_loop#{index} lagged"),
+                    Err(broadcast::error::RecvError::Lagged(_lag)) => anyhow::bail!("run_request_update_loop#{loop_index} lagged"),
                 },
 
                 maybe_rpc_requests_task = Self::get_next_requests(&requests_rx) => match maybe_rpc_requests_task {
                     Some(task) => {
                         metrics::requests_queue_size_dec();
                         if !task.shutdown.load(Ordering::Relaxed) {
+                            let timer = task.client_id.start_timer_cpu();
                             let _ = task.tx.send(Self::handle_request_task(
                                 task.request,
                                 &latest_blockhash_storage,
@@ -858,6 +874,7 @@ impl SolanaRpc {
                                 &leader_schedule_map_solfees,
                                 &leader_schedule_map_rpc
                             ));
+                            timer.stop_and_record();
                         }
                     },
                     None => break,
@@ -1098,6 +1115,7 @@ pub struct RpcRequestsStats {
 
 #[derive(Debug)]
 struct RpcRequestTask {
+    client_id: ClientId,
     request: RpcRequest,
     shutdown: Arc<AtomicBool>,
     tx: oneshot::Sender<JsonrpcOutputArced>,
