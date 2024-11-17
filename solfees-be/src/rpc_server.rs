@@ -22,7 +22,7 @@ use {
         net::TcpListener,
         sync::{broadcast, Notify},
     },
-    tracing::{error, info},
+    tracing::{debug, error, info},
 };
 
 pub async fn run_admin(addr: SocketAddr, shutdown: Arc<Notify>) -> anyhow::Result<()> {
@@ -73,6 +73,9 @@ pub async fn run_solfees(
     let listener = TcpListener::bind(addr).await?;
     info!(%addr, "Start Solfees RPC server");
 
+    let (ws_tx, _ws_rx) = broadcast::channel(1);
+    let ws_tx = Arc::new(ws_tx);
+
     let http = ServerBuilder::new(TokioExecutor::new());
     let graceful = GracefulShutdown::new();
     loop {
@@ -83,13 +86,13 @@ pub async fn run_solfees(
 
         let solana_rpc = solana_rpc.clone();
         let config_metrics = Arc::clone(&config_metrics);
-        let (shutdown_tx, shutdown_rx) = broadcast::channel(1);
+        let ws_tx = Arc::clone(&ws_tx);
         let connection = http.serve_connection_with_upgrades(
             TokioIo::new(Box::pin(stream)),
             service_fn(move |mut req: Request<BodyIncoming>| {
                 let solana_rpc = solana_rpc.clone();
                 let config_metrics = Arc::clone(&config_metrics);
-                let shutdown_rx = shutdown_rx.resubscribe();
+                let ws_tx = Arc::clone(&ws_tx);
                 async move {
                     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
                     enum ReqType {
@@ -129,7 +132,6 @@ pub async fn run_solfees(
                                         client_id,
                                         solana_rpc_mode,
                                         body.aggregate(),
-                                        shutdown_rx,
                                     )
                                 })
                                 .await
@@ -166,6 +168,7 @@ pub async fn run_solfees(
                                         client_id,
                                         solana_rpc_mode,
                                         websocket,
+                                        ws_tx.subscribe(),
                                     ));
                                     let (parts, body) = response.into_parts();
                                     Ok(Response::from_parts(parts, body.boxed()))
@@ -179,15 +182,16 @@ pub async fn run_solfees(
                 }
             }),
         );
-        let fut = graceful.watch(connection.into_owned());
-
+        let connection = graceful.watch(connection.into_owned());
         tokio::spawn(async move {
-            let _ = fut.await;
-            drop(shutdown_tx);
+            if let Err(error) = connection.await {
+                debug!(error, "connection error");
+            }
         });
     }
 
     drop(listener);
+    drop(ws_tx);
     graceful.shutdown().await;
 
     Ok::<(), anyhow::Error>(())

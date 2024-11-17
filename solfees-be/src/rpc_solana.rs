@@ -192,7 +192,6 @@ impl SolanaRpc {
         client_id: ClientId,
         mode: SolanaRpcMode,
         body: impl Buf,
-        mut shutdown_rx: broadcast::Receiver<()>,
     ) -> anyhow::Result<(RpcRequestsStats, Vec<u8>)> {
         let timer = client_id.start_timer_cpu();
         let mut stats = RpcRequestsStats::default();
@@ -534,14 +533,6 @@ impl SolanaRpc {
             let response_rx = join_all(rxs);
 
             tokio::select! {
-                value = shutdown_rx.recv() => match value {
-                    Ok(()) => unreachable!(),
-                    Err(broadcast::error::RecvError::Closed) => {
-                        shutdown.store(true, Ordering::Relaxed);
-                        anyhow::bail!("connection closed");
-                    },
-                    Err(broadcast::error::RecvError::Lagged(_)) => unreachable!(),
-                },
                 () = sleep(self.request_timeout) => {
                     shutdown.store(true, Ordering::Relaxed);
                     anyhow::bail!("request timeout");
@@ -590,6 +581,7 @@ impl SolanaRpc {
         client_id: ClientId,
         mode: SolanaRpcMode,
         websocket: HyperWebsocket,
+        mut shutdown_rx: broadcast::Receiver<()>,
     ) {
         let ws_frontend = match mode {
             SolanaRpcMode::Solfees => false,
@@ -627,6 +619,8 @@ impl SolanaRpc {
             };
 
             tokio::select! {
+                _ = shutdown_rx.recv() => break Some(None),
+
                 flush_result = websocket_tx_flush => match flush_result {
                     Ok(()) => {
                         flush_required = false;
