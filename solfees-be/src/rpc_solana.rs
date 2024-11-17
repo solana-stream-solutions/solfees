@@ -783,12 +783,19 @@ impl SolanaRpc {
                         hash,
                         time,
                         height,
-                        parent_slot: _parent_slot,
+                        parent_slot,
                         parent_hash: _parent_hash,
                         transactions,
                     } => {
-                        let info =
-                            StreamsSlotInfo::new(leader, slot, hash, time, height, transactions);
+                        let info = StreamsSlotInfo::new(
+                            leader,
+                            slot,
+                            parent_slot,
+                            hash,
+                            time,
+                            height,
+                            transactions,
+                        );
                         let _ = streams_tx.send(Arc::new(StreamsUpdateMessage::Slot { info }));
                     }
                 },
@@ -838,7 +845,7 @@ impl SolanaRpc {
                         } => {
                             latest_blockhash_storage.push_block(slot, parent_slot, height, hash);
 
-                            let info = StreamsSlotInfo::new(leader, slot, hash, time, height, transactions);
+                            let info = StreamsSlotInfo::new(leader, slot, parent_slot, hash, time, height, transactions);
                             slots_info.insert(slot, info.clone());
                             while slots_info.len() > MAX_NUM_RECENT_SLOT_INFO {
                                 slots_info.pop_first();
@@ -1264,6 +1271,7 @@ struct LatestBlockhashSlot {
 struct StreamsSlotInfo {
     leader: Option<Pubkey>,
     slot: Slot,
+    parent_slot: Slot,
     commitment: CommitmentLevel,
     hash: Hash,
     time: UnixTimestamp,
@@ -1279,6 +1287,7 @@ impl StreamsSlotInfo {
     fn new(
         leader: Option<Pubkey>,
         slot: Slot,
+        parent_slot: Slot,
         hash: Hash,
         time: UnixTimestamp,
         height: Slot,
@@ -1298,6 +1307,7 @@ impl StreamsSlotInfo {
         Self {
             leader,
             slot,
+            parent_slot,
             commitment: CommitmentLevel::Processed,
             hash,
             time,
@@ -1348,6 +1358,7 @@ impl StreamsSlotInfo {
         SlotsSubscribeOutput::Slot {
             leader: self.leader.map(|pk| pk.to_string()).unwrap_or_default(),
             slot: self.slot,
+            parent_slot: self.parent_slot,
             commitment: self.commitment,
             hash: self.hash.to_string(),
             time: self.time,
@@ -1523,6 +1534,7 @@ enum SlotsSubscribeOutput {
     Slot {
         leader: String,
         slot: Slot,
+        parent_slot: Slot,
         commitment: CommitmentLevel,
         hash: String,
         time: UnixTimestamp,
