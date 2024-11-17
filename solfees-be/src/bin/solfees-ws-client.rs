@@ -24,6 +24,10 @@ struct Args {
     /// Up to 5 levels (bps)
     #[clap(long, default_values_t = [2000, 5000, 9000])]
     levels: Vec<u16>,
+
+    /// Skip transactions with zero unit price
+    #[clap(long, default_value_t = false)]
+    skip_zeros: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -32,6 +36,7 @@ struct SubscriptionParams {
     read_write: Vec<String>,
     read_only: Vec<String>,
     levels: Vec<u16>,
+    skip_zeros: bool,
 }
 
 #[tokio::main]
@@ -46,6 +51,7 @@ async fn main() -> anyhow::Result<()> {
             read_write: args.read_write.unwrap_or_default(),
             read_only: args.read_only.unwrap_or_default(),
             levels: args.levels,
+            skip_zeros: args.skip_zeros,
         }
     }))
     .context("failed to create request")?;

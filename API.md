@@ -16,7 +16,7 @@ Accept `percentile` option that calculate fee as percentile (bps, i.e. allowed v
 
 #### `getRecentPrioritizationFees`
 
-Provide more filters: accept read-write accounts, read-only accounts and up to 5 desired percentile levels. Response includes number of transactions, number of filtered transactions, average fee and requested levels with slot and commitment.
+Provide more filters: accept read-write accounts, read-only accounts, up to 5 desired percentile levels and allow to exclude transactions with zero unit price. Response includes number of transactions, number of filtered transactions, average fee and requested levels with slot and commitment.
 
 ## Original Solana API
 
@@ -149,7 +149,8 @@ defaults:
 
   - `readWrite`: `[]`
   - `readOnly`: `[]`
-  - `percentile`: `0`
+  - `levels`: `[]`
+  - `skipZeros`: `false`
 
 ```
 > {"method":"getRecentPrioritizationFees","jsonrpc":"2.0","params":[{"readWrite":[],"readOnly":["TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"],"levels":[5000, 9500]}],"id":"1"}

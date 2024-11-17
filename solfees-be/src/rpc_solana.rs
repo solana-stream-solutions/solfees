@@ -1267,7 +1267,9 @@ impl StreamsSlotInfo {
                     .iter()
                     .all(|pubkey| tx.accounts.readable.contains(pubkey))
         }) {
-            fees.push(transaction.unit_price);
+            if transaction.unit_price > 0 || !filter.skip_zeros {
+                fees.push(transaction.unit_price);
+            }
         }
         let total_transactions_filtered = fees.len();
 
@@ -1389,6 +1391,7 @@ struct ReqParamsSlotsSubscribeConfig {
     read_write: Vec<String>,
     read_only: Vec<String>,
     levels: Vec<u16>,
+    skip_zeros: bool,
 }
 
 #[derive(Debug)]
@@ -1396,6 +1399,7 @@ struct SlotSubscribeFilter {
     read_write: Vec<Pubkey>,
     read_only: Vec<Pubkey>,
     levels: Vec<u16>,
+    skip_zeros: bool,
 }
 
 impl TryFrom<ReqParamsSlotsSubscribeConfig> for SlotSubscribeFilter {
@@ -1446,6 +1450,7 @@ impl TryFrom<ReqParamsSlotsSubscribeConfig> for SlotSubscribeFilter {
             read_write,
             read_only,
             levels: config.levels,
+            skip_zeros: config.skip_zeros,
         })
     }
 }

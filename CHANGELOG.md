@@ -29,5 +29,6 @@ The minor version will be incremented upon a breaking change and the patch versi
 - geyser: do not stream outdated data ([#17](https://github.com/solana-stream-solutions/solfees/pull/17))
 - backend: add metrics of used resources ([#18](https://github.com/solana-stream-solutions/solfees/pull/18))
 - backend: fix ws stream shutdown ([#19](https://github.com/solana-stream-solutions/solfees/pull/19))
+- api: add `skipZeros` to `gRPF` solfees ([#19](https://github.com/solana-stream-solutions/solfees/pull/19))
 
 ### Breaking
