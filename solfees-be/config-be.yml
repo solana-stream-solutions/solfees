@@ -18,3 +18,10 @@ listen_rpc:
   calls_queue_max: 16384 # Maximum number of requests in the queue (each request can contain max `request_calls_max` calls)
   streams_channel_capacity: 512 # Maximum number of messages in WebSocket channel before disconnect
   pool_size: 2 # Number of workers processing requests (WebSocket streams processed by separate task)
+
+metrics:
+  # `null` means empty label will be used (default value)
+  usage_client_id: null
+  usage_subscription_id: null
+  # usage_client_id: "x-client-id"
+  # usage_subscription_id: "x-subscription-id"

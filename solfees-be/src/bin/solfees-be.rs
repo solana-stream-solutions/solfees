@@ -1,7 +1,7 @@
 use {
     futures::future::{try_join_all, FutureExt, TryFutureExt},
     solfees_be::{
-        cli, config::ConfigSolfees as Config, metrics::solfees_be as metrics, redis, rpc_server,
+        cli, config::ConfigBe as Config, metrics::solfees_be as metrics, redis, rpc_server,
         rpc_solana::SolanaRpc,
     },
     std::sync::Arc,
@@ -46,6 +46,7 @@ async fn main2(config: Config) -> anyhow::Result<()> {
         config.listen_rpc.bind,
         config.listen_rpc.body_limit,
         solana_rpc.clone(),
+        Arc::new(config.metrics),
         Arc::clone(&rpc_solfees_shutdown),
     ))
     .map(|result| result?)

@@ -99,6 +99,7 @@ pub mod solfees_be {
     use {
         super::{init2, REGISTRY},
         crate::{
+            config::ConfigMetrics,
             grpc_geyser::CommitmentLevel,
             rpc_solana::{RpcRequestsStats, SolanaRpcMode},
         },
@@ -245,21 +246,26 @@ pub mod solfees_be {
     }
 
     impl ClientId {
-        pub fn new(headers: &HeaderMap) -> Self {
+        pub fn new(headers: &HeaderMap, config_metrics: &ConfigMetrics) -> Self {
             Self {
                 inner: Arc::new(ClientIdInner {
-                    client_id: Self::get(headers, "x-client-id"),
-                    subsription_id: Self::get(headers, "x-subscription-id"),
+                    client_id: Self::get(headers, config_metrics.usage_client_id.as_deref()),
+                    subsription_id: Self::get(
+                        headers,
+                        config_metrics.usage_subscription_id.as_deref(),
+                    ),
                 }),
             }
         }
 
-        fn get(headers: &HeaderMap, key: &str) -> String {
-            headers
-                .get(key)
-                .and_then(|id| id.to_str().ok())
-                .map(String::from)
-                .unwrap_or_default()
+        fn get(headers: &HeaderMap, key: Option<&str>) -> String {
+            key.map_or_else(String::new, |key| {
+                headers
+                    .get(key)
+                    .and_then(|id| id.to_str().ok())
+                    .map(String::from)
+                    .unwrap_or_default()
+            })
         }
 
         pub fn start_timer(&self) -> ClientIdTimer {
