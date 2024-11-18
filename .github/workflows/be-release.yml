@@ -34,9 +34,9 @@ jobs:
 
       - name: rename binaries
         run: |
-          mv target/release/solfees-be target/release/solfees-be-${{ matrix.is }}
+          mv target/release/solfees-be target/release/solfees-be-${{ matrix.os }}
           mv target/release/solfees-grpc2redis target/release/solfees-grpc2redis-${{ matrix.os }}
-          mv target/release/solfees-ws-client target/release/solfees-ws-client-${{ matrix.is }}
+          mv target/release/solfees-ws-client target/release/solfees-ws-client-${{ matrix.os }}
 
       - name: upload artifact
         if: startsWith(github.ref, 'refs/tags/') != true

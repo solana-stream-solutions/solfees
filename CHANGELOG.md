@@ -14,6 +14,10 @@ The minor version will be incremented upon a breaking change and the patch versi
 
 ### Features
 
+### Breaking
+
+## [2.0.0] - 2024-11-18
+
 - api: add getLeaderSchedule ([#1](https://github.com/solana-stream-solutions/solfees/pull/1))
 - rpc: run multiple handlers ([#2](https://github.com/solana-stream-solutions/solfees/pull/2))
 - api: fix getLeaderSchedule for frontend ([#3](https://github.com/solana-stream-solutions/solfees/pull/3))
@@ -30,5 +34,4 @@ The minor version will be incremented upon a breaking change and the patch versi
 - backend: add metrics of used resources ([#18](https://github.com/solana-stream-solutions/solfees/pull/18))
 - backend: fix ws stream shutdown ([#19](https://github.com/solana-stream-solutions/solfees/pull/19))
 - api: add `skipZeros` to `gRPF` solfees ([#20](https://github.com/solana-stream-solutions/solfees/pull/20))
-
-### Breaking
+- api: fix context slot ([#21](https://github.com/solana-stream-solutions/solfees/pull/21))
