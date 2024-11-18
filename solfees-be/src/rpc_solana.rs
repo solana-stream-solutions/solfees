@@ -1167,6 +1167,7 @@ impl LatestBlockhashStorage {
         }
 
         // in case of epoch change with a lot of forks we can receive confirmed directly
+        // and processed would be behind, so we take `max(processed, confirmed)`
         self.slot_processed = self.slot_processed.max(self.slot_confirmed);
     }
 
@@ -1189,12 +1190,12 @@ impl LatestBlockhashStorage {
             },
         );
 
-        // keep slots under the limit
+        // keep slots under the limit (based only on finalized count)
         let slots_to_remove = self
             .slots
             .values()
-            .filter_map(|entry| (entry.commitment == CommitmentLevel::Finalized).then_some(1))
-            .sum::<usize>()
+            .filter(|entry| entry.commitment == CommitmentLevel::Finalized)
+            .count()
             .checked_sub(MAX_PROCESSING_AGE + 10)
             .unwrap_or_default();
         for _ in 0..slots_to_remove {
