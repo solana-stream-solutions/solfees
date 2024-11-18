@@ -4636,7 +4636,7 @@ dependencies = [
 
 [[package]]
 name = "solfees-be"
-version = "2.0.0"
+version = "2.0.0+solana.2.0.15"
 dependencies = [
  "anyhow",
  "bincode",
