@@ -1325,6 +1325,7 @@ impl StreamsSlotInfo {
         let mut fees = Vec::with_capacity(self.transactions.len());
         for transaction in self.transactions.iter().filter(|tx| {
             !tx.vote
+                && tx.unit_limit > 0
                 && filter
                     .read_write
                     .iter()
@@ -1387,7 +1388,10 @@ impl RecentPrioritizationFeesSlot {
         let mut writable_account_fees =
             HashMap::<Pubkey, Vec<u64>>::with_capacity(transactions.len());
 
-        for transaction in transactions.iter().filter(|tx| !tx.vote) {
+        for transaction in transactions
+            .iter()
+            .filter(|tx| !tx.vote && tx.unit_limit > 0)
+        {
             transaction_fees.push(transaction.unit_price);
             for writable_account in transaction.accounts.writable.iter().copied() {
                 writable_account_fees
