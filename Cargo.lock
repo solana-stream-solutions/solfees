@@ -3899,7 +3899,7 @@ dependencies = [
  "spl-token-group-interface",
  "spl-token-metadata-interface",
  "thiserror",
- "zstd",
+ "zstd 0.11.2+zstd.1.5.2",
 ]
 
 [[package]]
@@ -4636,7 +4636,7 @@ dependencies = [
 
 [[package]]
 name = "solfees-be"
-version = "2.0.0"
+version = "3.0.0"
 dependencies = [
  "anyhow",
  "bincode",
@@ -5352,6 +5352,7 @@ dependencies = [
  "tower-layer",
  "tower-service",
  "tracing",
+ "zstd 0.13.2",
 ]
 
 [[package]]
@@ -6092,9 +6093,9 @@ dependencies = [
 
 [[package]]
 name = "yellowstone-grpc-client"
-version = "2.0.0"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c73838262cb899d64e2c94ac6ca2fb5bc5d565aa4f04a68b969645a40a06c2c"
+checksum = "6adea92d06ab083f1c5845cf0aa9fb00320470573501f59d58c5c0c4e64720ae"
 dependencies = [
  "bytes",
  "futures",
@@ -6106,9 +6107,9 @@ dependencies = [
 
 [[package]]
 name = "yellowstone-grpc-proto"
-version = "2.0.0"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b740e0601335c649640732e4cb4061a4ef4bb27017e8e76e4caa3c03566dd0e"
+checksum = "91ffb8d470e9876b946d1ac103a022ae8522ec1ecd41e7883d609d31f035326d"
 dependencies = [
  "anyhow",
  "bincode",
@@ -6235,7 +6236,16 @@ version = "0.11.2+zstd.1.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "20cc960326ece64f010d2d2107537f26dc589a6573a316bd5b1dba685fa5fde4"
 dependencies = [
- "zstd-safe",
+ "zstd-safe 5.0.2+zstd.1.5.2",
+]
+
+[[package]]
+name = "zstd"
+version = "0.13.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fcf2b778a664581e31e389454a7072dab1647606d44f7feea22cd5abb9c9f3f9"
+dependencies = [
+ "zstd-safe 7.2.1",
 ]
 
 [[package]]
@@ -6245,6 +6255,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d2a5585e04f9eea4b2a3d1eca508c4dee9592a89ef6f450c11719da0726f4db"
 dependencies = [
  "libc",
+ "zstd-sys",
+]
+
+[[package]]
+name = "zstd-safe"
+version = "7.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "54a3ab4db68cea366acc5c897c7b4d4d1b8994a9cd6e6f841f8964566a419059"
+dependencies = [
  "zstd-sys",
 ]
 

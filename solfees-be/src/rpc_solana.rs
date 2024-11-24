@@ -999,7 +999,7 @@ impl SolanaRpc {
                     .iter()
                     .map(|(slot, value)| RpcPrioritizationFee {
                         slot: *slot,
-                        prioritization_fee: value.fees.get_fee(&pubkeys, percentile),
+                        prioritization_fee: value.fees.get_fee(&pubkeys, &[], false, percentile).1,
                     })
                     .collect::<Vec<_>>();
 
@@ -1322,39 +1322,47 @@ impl StreamsSlotInfo {
     }
 
     fn get_filtered(&self, filter: &SlotSubscribeFilter) -> SlotsSubscribeOutput {
-        let mut fees = Vec::with_capacity(self.transactions.len());
-        for transaction in self.transactions.iter().filter(|tx| {
-            !tx.vote
-                && filter
-                    .read_write
-                    .iter()
-                    .all(|pubkey| tx.accounts.writable.contains(pubkey))
-                && filter
-                    .read_only
-                    .iter()
-                    .all(|pubkey| tx.accounts.readable.contains(pubkey))
-        }) {
-            if transaction.unit_price > 0 || !filter.skip_zeros {
-                fees.push(transaction.unit_price);
-            }
-        }
-        let total_transactions_filtered = fees.len();
+        let total_transactions_filtered = self
+            .transactions
+            .iter()
+            .filter(|tx| {
+                !tx.vote
+                    && tx.unit_limit > 0
+                    && filter
+                        .read_write
+                        .iter()
+                        .all(|pubkey| tx.accounts.writable.contains(pubkey))
+                    && filter
+                        .read_only
+                        .iter()
+                        .all(|pubkey| tx.accounts.readable.contains(pubkey))
+            })
+            .count();
 
-        let fee_average = if total_transactions_filtered == 0 {
-            0f64
-        } else {
-            fees.iter().copied().sum::<u64>() as f64 / total_transactions_filtered as f64
-        };
-        let fee_levels = if filter.levels.is_empty() {
-            vec![]
-        } else {
-            fees.sort_unstable();
-            filter
-                .levels
-                .iter()
-                .map(|percentile| RecentPrioritizationFeesSlot::get_percentile(&fees, *percentile))
-                .collect()
-        };
+        let fee_average = self
+            .fees
+            .get_fee(
+                &filter.read_write,
+                &filter.read_only,
+                filter.skip_zeros,
+                None,
+            )
+            .0;
+
+        let fee_levels = filter
+            .levels
+            .iter()
+            .map(|level| {
+                self.fees
+                    .get_fee(
+                        &filter.read_write,
+                        &filter.read_only,
+                        filter.skip_zeros,
+                        Some(*level),
+                    )
+                    .1
+            })
+            .collect();
 
         SlotsSubscribeOutput::Slot {
             leader: self.leader.map(|pk| pk.to_string()).unwrap_or_default(),
@@ -1377,62 +1385,153 @@ impl StreamsSlotInfo {
 
 #[derive(Debug)]
 struct RecentPrioritizationFeesSlot {
-    transaction_fees: Vec<u64>,
-    writable_account_fees: HashMap<Pubkey, Vec<u64>>,
+    transaction_fees: CollectedFees,
+    transaction_fees_nz: CollectedFees,
+    writable_account_fees: HashMap<Pubkey, CollectedFees>,
+    writable_account_fees_nz: HashMap<Pubkey, CollectedFees>,
+    readable_account_fees: HashMap<Pubkey, CollectedFees>,
+    readable_account_fees_nz: HashMap<Pubkey, CollectedFees>,
 }
 
 impl RecentPrioritizationFeesSlot {
     fn create(transactions: &[GeyserTransaction]) -> Self {
         let mut transaction_fees = Vec::with_capacity(transactions.len());
+        let mut transaction_fees_nz = Vec::with_capacity(transactions.len());
         let mut writable_account_fees =
             HashMap::<Pubkey, Vec<u64>>::with_capacity(transactions.len());
+        let mut writable_account_fees_nz =
+            HashMap::<Pubkey, Vec<u64>>::with_capacity(transactions.len());
+        let mut readable_account_fees =
+            HashMap::<Pubkey, Vec<u64>>::with_capacity(transactions.len());
+        let mut readable_account_fees_nz =
+            HashMap::<Pubkey, Vec<u64>>::with_capacity(transactions.len());
 
-        for transaction in transactions.iter().filter(|tx| !tx.vote) {
+        for transaction in transactions
+            .iter()
+            .filter(|tx| !tx.vote && tx.unit_limit > 0)
+        {
             transaction_fees.push(transaction.unit_price);
-            for writable_account in transaction.accounts.writable.iter().copied() {
+            for account in transaction.accounts.writable.iter().copied() {
                 writable_account_fees
-                    .entry(writable_account)
+                    .entry(account)
                     .or_default()
                     .push(transaction.unit_price);
             }
-        }
+            for account in transaction.accounts.readable.iter().copied() {
+                readable_account_fees
+                    .entry(account)
+                    .or_default()
+                    .push(transaction.unit_price);
+            }
 
-        transaction_fees.sort_unstable();
-        for (_account, fees) in writable_account_fees.iter_mut() {
-            fees.sort_unstable();
-        }
-
-        Self {
-            transaction_fees,
-            writable_account_fees,
-        }
-    }
-
-    fn get_fee(&self, account_keys: &[Pubkey], percentile: Option<u16>) -> u64 {
-        let mut fee =
-            Self::get_with_percentile(&self.transaction_fees, percentile).unwrap_or_default();
-
-        for account_key in account_keys {
-            if let Some(fees) = self.writable_account_fees.get(account_key) {
-                if let Some(account_fee) = Self::get_with_percentile(fees, percentile) {
-                    fee = std::cmp::max(fee, account_fee);
+            if transaction.unit_price > 0 {
+                transaction_fees_nz.push(transaction.unit_price);
+                for account in transaction.accounts.writable.iter().copied() {
+                    writable_account_fees_nz
+                        .entry(account)
+                        .or_default()
+                        .push(transaction.unit_price);
+                }
+                for account in transaction.accounts.readable.iter().copied() {
+                    readable_account_fees_nz
+                        .entry(account)
+                        .or_default()
+                        .push(transaction.unit_price);
                 }
             }
         }
 
-        fee
-    }
+        let conv = |map: HashMap<Pubkey, Vec<u64>>| {
+            map.into_iter()
+                .map(|(account, fees)| (account, CollectedFees::new(fees)))
+                .collect()
+        };
 
-    fn get_with_percentile(fees: &[u64], percentile: Option<u16>) -> Option<u64> {
-        match percentile {
-            Some(percentile) => Self::get_percentile(fees, percentile),
-            None => fees.first().copied(),
+        Self {
+            transaction_fees: CollectedFees::new(transaction_fees),
+            transaction_fees_nz: CollectedFees::new(transaction_fees_nz),
+            writable_account_fees: conv(writable_account_fees),
+            writable_account_fees_nz: conv(writable_account_fees_nz),
+            readable_account_fees: conv(readable_account_fees),
+            readable_account_fees_nz: conv(readable_account_fees_nz),
         }
     }
 
-    fn get_percentile(fees: &[u64], percentile: u16) -> Option<u64> {
-        let index = (percentile as usize).min(9_999) * fees.len() / 10_000;
-        fees.get(index).copied()
+    fn get_fee(
+        &self,
+        writeable_account_keys: &[Pubkey],
+        readable_account_keys: &[Pubkey],
+        skip_zeros: bool,
+        percentile: Option<u16>,
+    ) -> (f64, u64) {
+        let (txs, write_map, read_map) = if skip_zeros {
+            (
+                &self.transaction_fees_nz,
+                &self.writable_account_fees_nz,
+                &self.readable_account_fees_nz,
+            )
+        } else {
+            (
+                &self.transaction_fees,
+                &self.writable_account_fees,
+                &self.readable_account_fees,
+            )
+        };
+
+        let (mut avg, mut fee) = txs.get_with_percentile(percentile);
+
+        if let Some((aavg, afee)) = writeable_account_keys
+            .iter()
+            .zip(std::iter::repeat(write_map))
+            .chain(
+                readable_account_keys
+                    .iter()
+                    .zip(std::iter::repeat(read_map)),
+            )
+            .filter_map(|(account, map)| {
+                map.get(account)
+                    .map(|fees| fees.get_with_percentile(percentile))
+            })
+            .reduce(|(avg1, fee1), (avg2, fee2)| (avg1.max(avg2), fee1.max(fee2)))
+        {
+            avg = avg.max(aavg);
+            fee = fee.max(afee);
+        }
+
+        (avg, fee)
+    }
+}
+
+#[derive(Debug)]
+struct CollectedFees {
+    fees: Vec<u64>,
+    average: f64,
+}
+
+impl From<Vec<u64>> for CollectedFees {
+    fn from(fees: Vec<u64>) -> Self {
+        Self::new(fees)
+    }
+}
+
+impl CollectedFees {
+    fn new(mut fees: Vec<u64>) -> Self {
+        fees.sort_unstable();
+        let average = fees.iter().map(|fee| *fee as f64).sum::<f64>() / fees.len() as f64;
+        Self { fees, average }
+    }
+
+    fn get_with_percentile(&self, percentile: Option<u16>) -> (f64, u64) {
+        let fee = match percentile {
+            Some(percentile) => self.get_percentile(percentile),
+            None => self.fees.first().copied(),
+        };
+        (self.average, fee.unwrap_or_default())
+    }
+
+    fn get_percentile(&self, percentile: u16) -> Option<u64> {
+        let index = (percentile as usize).min(9_999) * self.fees.len() / 10_000;
+        self.fees.get(index).copied()
     }
 }
 
@@ -1544,7 +1643,7 @@ enum SlotsSubscribeOutput {
         total_transactions_vote: usize,
         total_transactions: usize,
         fee_average: f64,
-        fee_levels: Vec<Option<u64>>,
+        fee_levels: Vec<u64>,
         total_fee: u64,
         total_units_consumed: u64,
     },
@@ -1567,7 +1666,7 @@ enum SlotsSubscribeOutputSolana {
         total_transactions_vote: usize,
         total_transactions: usize,
         fee_average: f64,
-        fee_levels: Vec<Option<u64>>,
+        fee_levels: Vec<u64>,
     },
 }
 
@@ -1611,7 +1710,7 @@ struct SolfeesPrioritizationFee {
     total_transactions_vote: usize,
     total_transactions: usize,
     fee_average: f64,
-    fee_levels: Vec<Option<u64>>,
+    fee_levels: Vec<u64>,
 }
 
 impl TryFrom<SlotsSubscribeOutput> for SolfeesPrioritizationFee {

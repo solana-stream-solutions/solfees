@@ -49,8 +49,8 @@ tower = "0.5.1"
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
 vergen = "9.0.0"
-yellowstone-grpc-client = "2.0.0"
-yellowstone-grpc-proto = "2.0.0"
+yellowstone-grpc-client = "3.0.0"
+yellowstone-grpc-proto = "3.0.0"
 
 [workspace.lints.clippy]
 clone_on_ref_ptr = "deny"
