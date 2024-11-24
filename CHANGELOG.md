@@ -16,11 +16,11 @@ The minor version will be incremented upon a breaking change and the patch versi
 
 ### Breaking
 
-## [2.1.0] - 2024-11-22
+## [3.0.0] - 2024-11-24
 
 ### Breaking
 
-- api: ??? ([#22](https://github.com/solana-stream-solutions/solfees/pull/22))
+- api: change solfees fee calculation ([#22](https://github.com/solana-stream-solutions/solfees/pull/22))
 
 ## [2.0.0] - 2024-11-18
 
