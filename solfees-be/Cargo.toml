@@ -1,6 +1,6 @@
 [package]
 name = "solfees-be"
-version = "3.0.0"
+version = "3.0.0+solana.2.0.16"
 authors = { workspace = true }
 edition = { workspace = true }
 description = "Backend of solfees.io"
