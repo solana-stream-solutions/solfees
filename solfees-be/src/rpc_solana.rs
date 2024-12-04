@@ -1517,7 +1517,11 @@ impl From<Vec<u64>> for CollectedFees {
 impl CollectedFees {
     fn new(mut fees: Vec<u64>) -> Self {
         fees.sort_unstable();
-        let average = fees.iter().map(|fee| *fee as f64).sum::<f64>() / fees.len() as f64;
+        let average = if fees.is_empty() {
+            0f64
+        } else {
+            fees.iter().map(|fee| *fee as f64).sum::<f64>() / fees.len() as f64
+        };
         Self { fees, average }
     }
 
@@ -1622,9 +1626,9 @@ impl TryFrom<ReqParamsSlotsSubscribeConfig> for SlotSubscribeFilter {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-enum SlotsSubscribeOutput {
+pub enum SlotsSubscribeOutput {
     #[serde(rename_all = "camelCase")]
     Status {
         slot: Slot,
