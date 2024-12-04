@@ -9,7 +9,9 @@ interface Props {
 export const SimpleCell = ({ items, slots }: Props) => {
   return (
     <div className="px-3 text-right">
-      {items.map((elt, idx) => {
+      {items.map((rawElt, idx) => {
+        // this is crutch, until BE fixes null for "feeAverage"
+        const elt = rawElt ?? 0;
         const currentSlot = slots[idx];
         const isFilled = currentSlot ? isReal(currentSlot) : false;
 
