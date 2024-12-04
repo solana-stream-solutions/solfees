@@ -16,6 +16,10 @@ The minor version will be incremented upon a breaking change and the patch versi
 
 ### Breaking
 
+## [3.0.1] - 2024-12-04
+
+- api: fix fee_average ([#24](https://github.com/solana-stream-solutions/solfees/pull/24))
+
 ## [3.0.0] - 2024-11-24
 
 ### Breaking

@@ -2,15 +2,17 @@ use {
     anyhow::Context,
     clap::Parser,
     futures::{future::TryFutureExt, stream::StreamExt},
+    jsonrpc_core::Success as RpcSuccess,
     serde::Serialize,
+    solfees_be::rpc_solana::SlotsSubscribeOutput,
     tokio_tungstenite::{connect_async, tungstenite::protocol::Message},
-    tracing::info,
+    tracing::{error, info},
 };
 
 #[derive(Debug, Clone, Parser)]
 #[clap(author, version, about)]
 struct Args {
-    #[clap(short, long, default_value_t = String::from("wss://api.solfees.io/api/solana/solfees/ws"))]
+    #[clap(short, long, default_value_t = String::from("wss://api.solfees.io/api/solfees/ws"))]
     endpoint: String,
 
     /// Select transactions where mentioned accounts are readWrite
@@ -78,7 +80,15 @@ async fn main() -> anyhow::Result<()> {
                 Some(Err(error)) => anyhow::bail!(error),
                 None => anyhow::bail!("stream finished"),
             };
-            info!("new message: {text}");
+            let Ok(RpcSuccess { result, .. }) = serde_json::from_str::<RpcSuccess>(&text) else {
+                error!("failed to parse message: {text}");
+                continue;
+            };
+            let Ok(output) = serde_json::from_value::<SlotsSubscribeOutput>(result) else {
+                error!("failed to parse result from message: {text}");
+                continue;
+            };
+            info!("new message: {output:?}");
         }
         #[allow(unreachable_code)]
         Ok::<(), anyhow::Error>(())
